@@ -55,6 +55,8 @@ int bytes_sent, bytes_received;
 struct sockaddr_in server; /* server's address information */
 struct sockaddr_in cliaddr; /* client's address information */
 int sin_size;
+fd_set allset;
+
 
 // create new user from username, password, status
 User *createNewUser(char* username, char* password, int status) {
@@ -217,22 +219,23 @@ int validPortNumber(int port) {
 	return (port > 0) && (port <= 65535);
 }
 // send messgage to Client
-void sendByte(char* message) {
-	bytes_sent = send(conn_sock, message, strlen(message), 0);
+void sendByte(char* message, int sockfd) {
+	bytes_sent = send(sockfd, message, strlen(message), 0);
 	if(bytes_sent <= 0){
 		printf("\nConnection closed!\n");
-		close(conn_sock);
+		FD_CLR(sockfd, &allset);
+		close(sockfd);
 	}
 }
 // Compile message with code
-void sendToClient(char* message, int code) {
+void sendToClient(char* message, int code, int sockfd) {
 	char mess[200];
 	char strCode[10];
 	char space[1] = " ";
 	snprintf(mess, 200, "%d ", code);
 	strcat(mess, message);
 	printf("%s\n", mess);
-	sendByte(mess);
+	sendByte(mess, sockfd);
 }
 // count number param of command
 int numberParametersOfCommand(char** temp) {
@@ -261,35 +264,35 @@ int isCommand(char** temp) {
 	return 0;
 }
 // send message to user with message code
-void sendMessage(enum StatusCode code) {
+void sendMessage(enum StatusCode code, int sockfd) {
 	switch (code) {
 		//success message
-		case LoginSuccess: sendToClient("Login Success", LoginSuccess);
+		case LoginSuccess: sendToClient("Login Success", LoginSuccess, sockfd);
 		break;
-		case UserNameSucess: sendToClient("UserName Success", UserNameSucess);
+		case UserNameSucess: sendToClient("UserName Success", UserNameSucess, sockfd);
 		break;
-		case PasswordSuccess: sendToClient("Password Success! You are Logged", PasswordSuccess);
+		case PasswordSuccess: sendToClient("Password Success! You are Logged", PasswordSuccess, sockfd);
 		break;
-		case LogoutSuccess: sendToClient("Logout Success", LogoutSuccess);
+		case LogoutSuccess: sendToClient("Logout Success", LogoutSuccess, sockfd);
 		break;
 		//error message
-		case PhaseError: sendToClient("Phase Error", PhaseError);
+		case PhaseError: sendToClient("Phase Error", PhaseError, sockfd);
 		break;
-		case Logged: sendToClient("You are logged", Logged);
+		case Logged: sendToClient("You are logged", Logged, sockfd);
 		break;
-		case NotLogin: sendToClient("You not loggin!", NotLogin);
+		case NotLogin: sendToClient("You not loggin!", NotLogin, sockfd);
 		break;
 		//invalid message
-		case PasswordIncorrect: sendToClient("Input Password Incorrect", PasswordIncorrect);
+		case PasswordIncorrect: sendToClient("Input Password Incorrect", PasswordIncorrect, sockfd);
 		break;
-		case UserNotExist: sendToClient("User Not Existed", UserNotExist);
+		case UserNotExist: sendToClient("User Not Existed", UserNotExist, sockfd);
 		break;
-		case UserIsBlocked: sendToClient("User is Blocked", UserIsBlocked);
+		case UserIsBlocked: sendToClient("User is Blocked", UserIsBlocked, sockfd);
 		break;
-		case CommandInvalid: sendToClient("Command inValid", CommandInvalid);
+		case CommandInvalid: sendToClient("Command inValid", CommandInvalid, sockfd);
 		break;
 		// server error message
-		case ServerError: sendToClient("ServerError", ServerError);
+		case ServerError: sendToClient("ServerError", ServerError, sockfd);
 		break;
 		default: break;
 	}
@@ -299,7 +302,7 @@ int identifyPassWord(User* user, char* password) {
 	return !strcmp(user->password, password);
 }
 // handle user command
-int handle(char* message, int login_status, User** user) {
+int handle(char* message, int login_status, User** user, int sockfd) {
 	char command[10];
 	char param[30];
 	char** temp = str_split(message, ' ');
@@ -317,23 +320,23 @@ int handle(char* message, int login_status, User** user) {
 				if(ptr != NULL) {
 					(*user) = ptr;
 					if(ptr->status == BLOCK) {
-						sendMessage(UserIsBlocked); // send block message
+						sendMessage(UserIsBlocked, sockfd); // send block message
 					} else {
-						sendMessage(UserNameSucess);
+						sendMessage(UserNameSucess, sockfd);
 						return UnAuthenticated; // if username success return UnAuthenticated status
 					}
 				} else {
-					sendMessage(UserNotExist); //else send user not found
+					sendMessage(UserNotExist, sockfd); //else send user not found
 				}
 			}
 			else if(!strcmp(command, COMMAND_PASSWORD)) {
-				sendMessage(PhaseError); // send phase error 
+				sendMessage(PhaseError, sockfd); // send phase error 
 			}
 			else if(!strcmp(command, COMMAND_LOGOUT)) {
-				sendMessage(NotLogin); // if user not loggin and command is LOGOUT
+				sendMessage(NotLogin, sockfd); // if user not loggin and command is LOGOUT
 			} 
 			else {
-				sendMessage(CommandInvalid);
+				sendMessage(CommandInvalid, sockfd);
 			}
 			return Unidentified;
 		case UnAuthenticated: 
@@ -341,22 +344,22 @@ int handle(char* message, int login_status, User** user) {
 				User* ptr = search(param);
 				if(ptr != NULL) {
 					user = &ptr;
-					sendMessage(UserNameSucess);
+					sendMessage(UserNameSucess, sockfd);
 					return UnAuthenticated; // return UnAuthenticated if username exist
 				} else {
 				*user = NULL;
-				sendMessage(UserNotExist);
+				sendMessage(UserNotExist, sockfd);
 				return Unidentified;
 				}
 			}
 			else if(!strcmp(command, COMMAND_PASSWORD)) {
 				if((*user)->status == BLOCK) {
-					sendMessage(UserIsBlocked);
+					sendMessage(UserIsBlocked, sockfd);
 					return Unidentified; // if user is block
 				}
 				if(identifyPassWord(*user, param)) {
 					(*user)->countLoginFails = 0;
-					sendMessage(PasswordSuccess);// if password success
+					sendMessage(PasswordSuccess, sockfd);// if password success
 					return Authenticated;
 				}
 				(*user)->countLoginFails ++; //if password invalid, increase count login fails
@@ -364,34 +367,35 @@ int handle(char* message, int login_status, User** user) {
 					(*user)->status = BLOCK; // block user
 					updateFile();
 				}
-				sendMessage(PasswordIncorrect);
+				sendMessage(PasswordIncorrect, sockfd);
 				return UnAuthenticated;
 			}
 			else if(!strcmp(command, COMMAND_LOGOUT)) {
-				sendMessage(NotLogin);// user not login
+				sendMessage(NotLogin, sockfd);// user not login
+				return UnAuthenticated;
 			} 
-			sendMessage(CommandInvalid);
+			sendMessage(CommandInvalid, sockfd);
 			return UnAuthenticated;
 		case Authenticated: 
 			if(!strcmp(command, COMMAND_USER)) {
-				sendMessage(Logged);
+				sendMessage(Logged, sockfd);
 			}
 			else if(!strcmp(command, COMMAND_PASSWORD)) {
-				sendMessage(Logged);
+				sendMessage(Logged, sockfd);
 			}
 			else if(!strcmp(command, COMMAND_LOGOUT)) {
 				*user = NULL;
-				sendMessage(LogoutSuccess); // success logout
+				sendMessage(LogoutSuccess, sockfd); // success logout
 				return Unidentified;
 			} 
 			else {
-				sendMessage(CommandInvalid);
+				sendMessage(CommandInvalid, sockfd);
 			}
 			return Authenticated;
 		default: break;
 		}
 	} else {
-		sendMessage(CommandInvalid);
+		sendMessage(CommandInvalid, sockfd);
 	}
 	return login_status; // return login status
 }
@@ -439,11 +443,10 @@ int main(int argc, char **argv)
  	int i, maxi, maxfd, sockfd;
  	int nready;
  	ssize_t	ret;
-	fd_set	readfds, allset;
+	fd_set	readfds;
 	socklen_t clilen;
 	Client client[FD_SETSIZE];
 
- 	pid_t pid; 
  	if(argc != 2) {
  		perror(" Error Parameter! Please input only port number\n ");
  		exit(0);
@@ -464,7 +467,7 @@ int main(int argc, char **argv)
 	{
 		client[i].socket_number = -1;
 		client[i].status = Unidentified;
-		client[i]->user = NULL;	
+		client[i].user = NULL;	
 	}		/* -1 indicates available entry */
 	FD_ZERO(&allset);
 	FD_SET(listen_sock, &allset);
@@ -490,7 +493,7 @@ int main(int argc, char **argv)
 					if (client[i].socket_number < 0) {
 						client[i].socket_number = conn_sock;
 						/* save descriptor */
-						client[i]->user = (User*) malloc(sizeof(User));
+						client[i].user = (User*) malloc(sizeof(User));
 						break;
 					}
 				if (i == FD_SETSIZE){
@@ -513,23 +516,23 @@ int main(int argc, char **argv)
 			if ( (sockfd = client[i].socket_number) < 0)
 				continue;
 			if (FD_ISSET(sockfd, &readfds)) {
+				printf("1\n");
 				ret = receiveData(sockfd, recv_data, BUFF_SIZE, 0);
 				if (ret <= 0){
 					FD_CLR(sockfd, &allset);
 					client[i].socket_number = -1;
 					client[i].status = Unidentified;
-					client[i]->user = NULL;
+					client[i].user = NULL;
 					close(sockfd);
 				}
 				
 				else {
-					client[i].status = handle(recv_data, client[i].status, &(client[i]->user));
-					if (ret <= 0){
-						FD_CLR(sockfd, &allset);
+					recv_data[ret - 1] = '\0';
+					client[i].status = handle(recv_data, client[i].status, &(client[i].user), sockfd);
+					if(!FD_ISSET(sockfd, &readfds)) {
 						client[i].socket_number = -1;
 						client[i].status = Unidentified;
-						client[i]->user = NULL;
-						close(sockfd);
+						client[i].user = NULL;
 					}
 				}
 

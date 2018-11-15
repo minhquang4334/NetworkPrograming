@@ -22,5 +22,4 @@ protocol: protocol.c
 clean:
 	rm -f *.o *~
 	rm server
-	rm protocol
 	rm client

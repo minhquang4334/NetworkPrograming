@@ -145,7 +145,7 @@ void* client_handler(void* conn_sock) {
 			        	fclose(tmpFile);
 			        	// remove file
 			            if (remove(tmpFileName) == 0)
-			                printf("%s file deleted successfully.\n", tmpFileName);
+			                printf("Handle Success!!! %s file deleted successfully.\n", tmpFileName);
 			            else
 			            {
 			                printf("Unable to delete the file\n");

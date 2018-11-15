@@ -12,3 +12,5 @@ ser: server.c
 
 clean:
 	rm -f *.o *~
+	rm server
+	rm client
