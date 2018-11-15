@@ -373,6 +373,7 @@ int handle(char* message, int login_status, User** user, int sockfd) {
 			else if(!strcmp(command, COMMAND_LOGOUT)) {
 				sendMessage(NotLogin, sockfd);// user not login
 				return UnAuthenticated;
+				
 			} 
 			sendMessage(CommandInvalid, sockfd);
 			return UnAuthenticated;
