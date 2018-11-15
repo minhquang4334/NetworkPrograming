@@ -175,7 +175,6 @@ int main(int argc, char **argv)
 	struct pollfd sockets[1024];
 	int sock_number = 0;
 	int current_size;
-	int ret;
 	int bytes_received;
 	client_status clientStatus[1024];
 	Message recvMess;
@@ -228,7 +227,7 @@ int main(int argc, char **argv)
 
 	//Step 4: Communicate with client
 	while(1){
-		ret = poll(sockets, sock_number, 3500000);
+		poll(sockets, sock_number, 3500000);
 		current_size = sock_number;
 		int i, j;
 		for(i = 0; i < current_size; i++) {
