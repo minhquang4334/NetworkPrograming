@@ -373,7 +373,7 @@ int handle(char* message, int login_status, User** user, int sockfd) {
 			else if(!strcmp(command, COMMAND_LOGOUT)) {
 				sendMessage(NotLogin, sockfd);// user not login
 				return UnAuthenticated;
-				
+
 			} 
 			sendMessage(CommandInvalid, sockfd);
 			return UnAuthenticated;
@@ -517,7 +517,6 @@ int main(int argc, char **argv)
 			if ( (sockfd = client[i].socket_number) < 0)
 				continue;
 			if (FD_ISSET(sockfd, &readfds)) {
-				printf("1\n");
 				ret = receiveData(sockfd, recv_data, BUFF_SIZE, 0);
 				if (ret <= 0){
 					FD_CLR(sockfd, &allset);
