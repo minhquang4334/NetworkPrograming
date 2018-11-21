@@ -1,35 +1,47 @@
-/*UDP Echo Server*/
-#include <stdio.h>          /* These are the usual header files */
+#include <stdio.h>          
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
+#include <signal.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <assert.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <sys/socket.h>
-#include <assert.h>
-#include <string.h>
-#include <unistd.h>
 #include <ctype.h>
 
-#define PORT 5550  /* Port that will be opened */ 
+#define	QSIZE	   8		/* size of input queue */
+#define	MAXDG	4096		/* max datagram size */
+#define SERV_PORT 5500
 #define BUFF_SIZE 1024
-
 #define NUMBEROFDOTSINIPV4 3 //number dots in ipv4
 #define NUMBEROFDOTSINIPV6 5 //number dots in ipv6
-#define NELEMS(x)  (sizeof(x) / sizeof((x)[0]))
 
-// global value
+typedef struct {
+  void		*dg_data;		/* ptr to actual datagram */
+  size_t	dg_len;			/* length of datagram */
+  struct sockaddr  *dg_sa;	/* ptr to sockaddr{} w/client's address */
+  socklen_t	dg_salen;		/* length of sockaddr{} */
+} DG;
+static DG	dg[QSIZE];			/* queue of datagrams to process */
+
+static int	iget;		/* next one for main loop to process */
+static int	iput;		/* next one for signal handler to read into */
+static int	nqueue;		/* # on queue for main loop to process */
+static socklen_t clilen;/* max length of sockaddr{} */
+static int		sockfd;
+
+static void	sig_io(int);
+
 char **tokens;
 struct in_addr ipv4addr;
 struct hostent *host;
 struct in_addr **addr_list;
 struct in_addr **alias_list;
-int server_sock; /* file descriptors */
-char buff[BUFF_SIZE];
-int bytes_sent, bytes_received;
-struct sockaddr_in server; /* server's address information */
-struct sockaddr_in client; /* client's address information */
-int sin_size;
 
 /*
 * Check valid number in range 0 -> 255
@@ -38,10 +50,7 @@ int sin_size;
 */
 int validNumber(char *value)
 {
-    if(!strcmp(value, "0")) {
-        return 1;
-    }
-    return (atoi(value) > 0) && (atoi(value) <= 255);
+    return (atoi(value) >= 0) && (atoi(value) <= 255);
 }
 
 /*
@@ -113,7 +122,7 @@ int checkDots(char *str)
         {
             // count number elements in array
         }
-        if((i-1) == NUMBEROFDOTSINIPV4) {
+        if((i-1) == NUMBEROFDOTSINIPV4 || (i-1) == 2) {
             return 1;
         }
     }
@@ -219,52 +228,119 @@ int main(int argc, char **argv)
  		perror("Invalid Port Number!\n");
  		exit(0);
  	}
-
-	//Step 1: Construct a UDP socket
-	if ((server_sock=socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){  /* calls socket() */
-		perror("\nError: ");
-		exit(0);
+	int			i;
+	const int	on = 1;
+	sigset_t	zeromask, newmask, oldmask;
+	
+	struct sockaddr_in	servaddr, cliaddr;
+	
+	if ((sockfd=socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){  /* calls socket() */
+		perror("socket() error\n");
+		return 0;
 	}
 	
-	//Step 2: Bind address to socket
-	server.sin_family = AF_INET;         
-	server.sin_port = htons(port_number);   /* Remember htons() from "Conversions" section? =) */
-	server.sin_addr.s_addr = INADDR_ANY;  /* INADDR_ANY puts your IP address automatically */   
-	bzero(&(server.sin_zero),8); /* zero the rest of the structure */
-
-  
-	if(bind(server_sock,(struct sockaddr*)&server,sizeof(struct sockaddr))==-1){ /* calls bind() */
-		perror("\nError: ");
-		exit(0);
-	}     
-	printf("Server running in port %d\n", port_number);
-	//Step 3: Communicate with clients
-	while(1){
-		sin_size=sizeof(client);
-    		
-		bytes_received = recvfrom(server_sock, buff, BUFF_SIZE-1, 0, (struct sockaddr *) &client,(unsigned int*) &sin_size);
+	bzero(&servaddr, sizeof(servaddr));
+	servaddr.sin_family      = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servaddr.sin_port        = htons(port_number);
+	if(bind(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr))==-1){ /* calls bind() */
+		perror("bind() error\n");
+		return 0;
+	}
 		
-		if (bytes_received < 0)
-			perror("\nError: ");
-		else{
-			buff[bytes_received - 1] = '\0';
-			printf("[%s:%d]: %s", inet_ntoa(client.sin_addr), ntohs(client.sin_port), buff); // print info of client
-			char *temp = malloc(sizeof(argv[1]) * strlen(buff));
-	        strcpy(temp, buff);
-	        char response[500] = "";
-	        if (checkIP(temp))
-	        {
-	            showInfoFromIP(buff, response); // save info host of ip in response
-	        } 
-	        else {
-	            showInfoFromDomain(buff, response); // save info host of domain in reponse
-	        }
-			bytes_sent = sendto(server_sock, response, 2000, 0, (struct sockaddr *) &client, sin_size ); /* send to the client welcome message */
-			if (bytes_sent < 0)
-				perror("\nError: ");
-		}				
-	}
+	clilen = sizeof(cliaddr);
 	
-	close(server_sock);
-	return 0;
+	for (i = 0; i < QSIZE; i++) {	/* init queue of buffers */
+		dg[i].dg_data = malloc(MAXDG);
+		dg[i].dg_sa = malloc(clilen);
+		dg[i].dg_salen = clilen;
+	}
+	iget = iput = nqueue = 0;
+	
+	/* Signal handlers are established for SIGIO. The socket owner is
+	 * set using fcntl and the signal-driven and non-blocking I/O flags are set using ioctl
+	 */
+	signal(SIGIO, sig_io);
+	fcntl(sockfd, F_SETOWN, getpid());
+	ioctl(sockfd, FIOASYNC, &on);
+	ioctl(sockfd, FIONBIO, &on);
+	
+	/* Three signal sets are initialized: zeromask (which never changes),
+	 * oldmask (which contains the old signal mask when we block SIGIO), and newmask.
+	 */
+	sigemptyset(&zeromask);		
+	sigemptyset(&oldmask);
+	sigemptyset(&newmask);
+	sigaddset(&newmask, SIGIO);	/* signal we want to block */
+	
+	/* Stores the current signal mask of the process in oldmask and then
+	 * logically ORs newmask into the current signal mask. This blocks SIGIO
+	 * and returns the current signal mask. We need SIGIO blocked when we test
+	 * nqueue at the top of the loop
+	 */
+	sigprocmask(SIG_BLOCK, &newmask, &oldmask);
+	
+	for ( ; ; ) {
+		while (nqueue == 0)
+			sigsuspend(&zeromask);	/* wait for datagram to process */
+
+		/* unblock SIGIO by calling sigprocmask to set the signal mask of
+		 * the process to the value that was saved earlier (oldmask).
+		 * The reply is then sent by sendto.
+		 */
+		sigprocmask(SIG_SETMASK, &oldmask, NULL);
+
+		sendto(sockfd, dg[iget].dg_data, dg[iget].dg_len, 0,
+			   dg[iget].dg_sa, dg[iget].dg_salen);
+
+		if (++iget >= QSIZE)
+			iget = 0;
+
+		/* SIGIO is blocked and the value of nqueue is decremented.
+		 * We must block the signal while modifying this variable since
+		 * it is shared between the main loop and the signal handler.
+		 */
+		sigprocmask(SIG_BLOCK, &newmask, &oldmask);
+		nqueue--;
+	}
+}
+
+static void sig_io(int signo)
+{
+	ssize_t		len;
+	DG			*ptr;
+	for (; ; ) {
+		if (nqueue >= QSIZE){
+			perror("receive overflow");
+			break;
+		}
+
+		ptr = &dg[iput];
+		ptr->dg_salen = clilen;
+		len = recvfrom(sockfd, ptr->dg_data, MAXDG, 0,
+					   ptr->dg_sa, &ptr->dg_salen);
+		if (len < 0) {
+			if (errno == EWOULDBLOCK)
+				break;		/* all done; no more queued to read */
+			else{
+				perror("recvfrom error");
+				break;
+			}
+		}
+		char temp[50];
+		strcpy(temp, ptr->dg_data);
+		char response[500] = "";
+		if (checkIP(temp)) {
+		    showInfoFromIP(ptr->dg_data, response); // save info host of ip in response
+		} 
+		else {
+		    showInfoFromDomain(ptr->dg_data, response); // save info host of domain in reponse
+		}
+		ptr->dg_len = strlen(response);
+		memcpy(ptr->dg_data, response, strlen(response));
+		nqueue++;
+		if (++iput >= QSIZE)
+			iput = 0;
+
+	}	
 }
