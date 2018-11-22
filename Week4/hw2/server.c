@@ -251,7 +251,7 @@ int main(int argc, char **argv)
 			printf("[%s:%d]: %s", inet_ntoa(client.sin_addr), ntohs(client.sin_port), buff); // print info of client
 			char *temp = malloc(sizeof(argv[1]) * strlen(buff));
 	        strcpy(temp, buff);
-	        char response[500] = "";
+	        char response[1000] = "";
 	        if (checkIP(temp))
 	        {
 	            showInfoFromIP(buff, response); // save info host of ip in response
