@@ -26,7 +26,7 @@ void printList() {
 }
 
 // add user to end of list
-void push(User* newUser) {
+void append(User* newUser) {
 	if(head == NULL) {
 		head = newUser;
 		current = newUser;
@@ -40,7 +40,7 @@ void push(User* newUser) {
 }
 
 // ad user to beginning of list
-void pushToBeginning(User** head, User * newUser) {
+void prepend(User** head, User * newUser) {
 	User * new_node;
     new_node = (User*)malloc(sizeof(User));
     new_node = newUser;
@@ -70,14 +70,50 @@ User* search(char *username) {
 
 
 // compare password 
-int identifyPassWord(User* user, char* password);
+int identifyPassWord(User* user, char* password){
+	return strcmp(user->password, password);
+}
 
+int isOnline(char *username){
+	User *user = search(username);
+	return username->isLogin;
+}
 // login
-int login(char* username, char* password);
+int login(char* username, char* password){
+	User *user = search(username);
+	if(user == NULL) return USER_NOT_FOUND;
+	else{
+		if(isOnline(username)) return USER_IS_ONLINE;
+		else if(user->countLoginFails < MAX_LOGIN_FAILS){
+			if(!identifyPassWord(user, password)){
+				user->isLogin=ONLINE;
+				user->countLoginFails=0;
+				return LOGIN_SUCCESS;
+			}
+			else{
+				user->countLoginFails++;
+				if(use->countLoginFails == MAX_LOGIN_FAILS)
+					return BLOCKED_USER;
+				return PASSWORD_INVALID;
+			}
+		}
+		else return USER_IS_BLOCKED;
+	}
+}
 
 // register
-int registerUser(char* username, char* password);
+int registerUser(char* username, char* password){
+	User *user = search(username);
+	if(user == NULL){
+		user = createNewUser(username, password, ACTIVE);
+		append(user);
+		return REGISTER_SUCCESS;
+	}
+	return ACCOUNT_IS_EXIST;
+}
 
 // logout
-int logout(User* user);
+int logout(User* user){
+
+}
 
