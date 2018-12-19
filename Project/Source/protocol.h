@@ -29,7 +29,7 @@ typedef enum {
 	TYPE_REQUEST_DOWNLOAD
 	TYPE_UPLOAD_FILE
 	TYPE_ERROR
-} MessageType
+} MessageType;
 
 typedef struct {
 	MessageType type;

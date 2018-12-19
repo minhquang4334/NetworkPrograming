@@ -36,10 +36,10 @@ User *createNewUser(char* username, char* password, int status);
 void printList();
 
 // add user to end of list
-void push(User* newUser);
+void append(User* newUser);
 
-// ad user to beginning of list
-void pushToBeginning(User** head, User * newUser);
+// add user to beginning of list
+void prepend(User** head, User * newUser);
 
 // // check list empty
 // int isEmpty();
