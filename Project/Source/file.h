@@ -10,11 +10,11 @@ int searchFileInFolder(char* fileName, char* folderPath);
 
 typedef struct requestFile{
 	char fileName[50];
-	int requestID;
+	int requestId;
 	struct requestFile *next;
 } RequestFile;
 
-void push();
+void push(RequestFile file);
 
 void remove();
 
