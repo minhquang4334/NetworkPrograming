@@ -45,7 +45,8 @@ void* client_handler(void* conn_sock) {
 	connSock = *((int *) conn_sock);
 	Message recvMess, sendMess, keyMess;
 	pthread_detach(pthread_self());
-
+	
+	
 	return NULL;
 }
 

@@ -18,5 +18,7 @@ void push(RequestFile file);
 
 void remove();
 
+void isFileExist(char* fileName);
+
 
 
