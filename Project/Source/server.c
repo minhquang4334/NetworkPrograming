@@ -50,6 +50,7 @@ void handleLogin(Message mess, int connSock) {
 		char** userStr = str_split(temp[1], ' ');
 		char** passStr = str_split(temp[1], ' ');
 		if((numberElementsInArray(userStr) == 2) || (numberElementsInArray(passStr) == 2)) {
+			
 			if(!strcmp(userStr[0], COMMAND_USER) || !strcmp(passStr[0], COMMAND_PASSWORD)) {
 				char username[30];
 				char password[20];
