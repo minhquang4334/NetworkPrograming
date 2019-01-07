@@ -13,16 +13,18 @@
 #include <pthread.h>
 
 #include "protocol.h"
-
+#include "authenticate.h"
+#include "validate.h"
+#include "status.h"
 
 #define PORT 5550   /* Port that will be opened */ 
 #define BACKLOG 2   /* Number of allowed connections */
 #define MAX_SIZE 10e6 * 100
 #define STORAGE "./storage/" //default save file place
 
-#define EXISTEDFILE "Error: File is existent on server"
 #define BUFF_SEND 1024
 #define PRIVATE_KEY 256
+int requestId = 1;
 /*
 * Check valid port number
 * @param int port
@@ -30,6 +32,54 @@
 */
 int validPortNumber(int port) {
 	return (port > 0) && (port <= 65535);
+}
+// count number param of command
+int numberElementsInArray(char** temp) {
+	int i;
+	for (i = 0; *(temp + i); i++)
+    {
+        // count number elements in array
+    }
+    return i;
+}
+
+void handleLogin(Message mess, int connSock) {
+	char** temp = str_split(mess.payload, '\n');
+	StatusCode loginCode;
+	if(numberElementsInArray(temp) == 3) {
+		char** userStr = str_split(temp[1], ' ');
+		char** passStr = str_split(temp[1], ' ');
+		if((numberElementsInArray(userStr) == 2) || (numberElementsInArray(passStr) == 2)) {
+			if(!strcmp(userStr[0], COMMAND_USER) || !strcmp(passStr[0], COMMAND_PASSWORD)) {
+				char username[30];
+				char password[20];
+				strcpy(username, userStr[1]);
+				strcpy(password, passStr[1]);
+				loginCode = login(username, password);
+			}
+		}
+	}
+	else {
+		loginCode = COMMAND_INVALID;
+		printf("Fails on handle Login!!");
+	}
+	sendWithCode(mess, loginCode, connSock);
+}
+
+void handleAuthenticateRequest(Message mess, int connSock) {
+	char* payloadHeader;
+	payloadHeader = getHeaderOfPayload(mess.payload);
+	if(strcmp(payloadHeader, LOGIN_CODE)) {
+		handleLogin(mess.payload, connSock);
+	} else if (strcmp(payloadHeader, REGISTER_CODE)) {
+
+	} else if(strcmp(payloadHeader, LOGOUT_CODE)) {
+
+	}
+}
+
+void handleRequestFile(Message recvMess, int connSock) {
+
 }
 /*
 * Handler Request from Client
@@ -41,12 +91,39 @@ void* client_handler(void* conn_sock) {
 	int bytes_received;
 	FILE *tmpFile;
 	int connSock;
-	ProtocolStatus status = WAITING_KEYCODE;
+	// ProtocolStatus status = WAITING_KEYCODE;
 	connSock = *((int *) conn_sock);
 	Message recvMess, sendMess, keyMess;
+	
 	pthread_detach(pthread_self());
-	
-	
+	while(1){
+		//receives message from client
+		bytes_received = receiveMessage(connSock, &recvMess); //blocking
+		if (bytes_received <= 0) {
+			printf("\nConnection closed");
+			break;
+		}
+		if(recvMess.requestId == 0) {
+			recvMess.requestId = requestId;
+		}
+		switch(recvMess.type) {
+			case TYPE_AUTHENTICATE: 
+				handleAuthenticateRequest(recvMess, connSock);
+				break;
+			case TYPE_REQUEST_FILE: 
+				handleRequestFile(recvMess, connSock);
+				break;
+			case TYPE_REQUEST_DOWNLOAD: 
+				break;
+			case TYPE_UPLOAD_FILE: 
+				break;
+			case TYPE_ERROR: 
+				break;
+			default: break;
+		}
+
+	}
+
 	return NULL;
 }
 
@@ -92,8 +169,10 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
+	readFile();
+	printList();
 	//Step 4: Communicate with client
-	while(1){
+	while(1) {
 		//accept request
 		sin_size = sizeof(struct sockaddr_in);
 		if ((conn_sock = accept(listen_sock,( struct sockaddr *)&client, (unsigned int*)&sin_size)) == -1) 

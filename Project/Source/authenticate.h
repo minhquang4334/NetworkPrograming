@@ -14,7 +14,12 @@
 #define BLOCK 0
 #define ACTIVE 1
 #define MAX_LOGIN_FAILS 3
-
+#define ACCOUNT_FILE "account.txt"
+#define OFFLINE 0
+#define ONLINE 1
+#define LOGIN_CODE "LOGIN"
+#define LOGOUT_CODE "LOGOUT"
+#define REGISTER_CODE "REGISTER"
 
 typedef struct user {
 	int id;
@@ -25,10 +30,8 @@ typedef struct user {
 	int countFails;
 	struct user *next;
 } User;
-
-User *head = NULL;
-User *current = NULL;
-
+extern User *head;
+extern User *current;
 //Create new User from username, password, status
 User *createNewUser(char* username, char* password, int status);
 
@@ -41,6 +44,9 @@ void append(User* newUser);
 // add user to beginning of list
 void prepend(User** head, User * newUser);
 
+void readFile();
+
+void updateFile();
 // // check list empty
 // int isEmpty();
 
@@ -72,7 +78,7 @@ int registerUser(char* username, char* password);
 // logout
 int logout(User* user);
 
-
+#endif
 
 
 

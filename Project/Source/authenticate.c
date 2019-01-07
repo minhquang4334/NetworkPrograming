@@ -1,4 +1,7 @@
-
+#include "authenticate.h"
+#include "status.h"
+User *head = NULL;
+User *current = NULL;
 // create new user from username, password, status
 User *createNewUser(char* username, char* password, int status) {
 	User *newUser = (User*)malloc(sizeof(User));
@@ -6,7 +9,7 @@ User *createNewUser(char* username, char* password, int status) {
 	strcpy(newUser->password, password);
 	newUser->status = status;
 	newUser->isLogin = OFFLINE;
-	newUser->countLoginFails = 0;
+	newUser->countFails = 0;
 	newUser->next = NULL;
 	return newUser;
 }
@@ -18,6 +21,7 @@ void printList() {
     while (ptr != NULL) {
         printf("Username: %s\n", ptr->username);
         printf("Status: %s\n", ((ptr->status == ACTIVE) ? "Active" : "Blocked"));
+        printf("isOnline: %s\n", ((ptr->isLogin == OFFLINE) ? "OFFLINE" : "ONLINE"));
         printf("----------------------------------\n");
 
         ptr = ptr->next;
@@ -76,7 +80,7 @@ int identifyPassWord(User* user, char* password){
 
 int isOnline(char *username){
 	User *user = search(username);
-	return username->isLogin;
+	return user->isLogin;
 }
 // login
 int login(char* username, char* password){
@@ -84,21 +88,67 @@ int login(char* username, char* password){
 	if(user == NULL) return USER_NOT_FOUND;
 	else{
 		if(isOnline(username)) return USER_IS_ONLINE;
-		else if(user->countLoginFails < MAX_LOGIN_FAILS){
+		else if(user->countFails < MAX_LOGIN_FAILS){
 			if(!identifyPassWord(user, password)){
-				user->isLogin=ONLINE;
-				user->countLoginFails=0;
+				user->isLogin = ONLINE;
+				user->countFails = 0;
 				return LOGIN_SUCCESS;
 			}
 			else{
-				user->countLoginFails++;
-				if(use->countLoginFails == MAX_LOGIN_FAILS)
+				user->countFails ++;
+				if(user->countFails == MAX_LOGIN_FAILS)
 					return BLOCKED_USER;
 				return PASSWORD_INVALID;
 			}
 		}
-		else return USER_IS_BLOCKED;
+		else 
+			return USER_IS_BLOCKED;
 	}
+}
+// exit program
+void exitProgram() {
+	printf("End Program : File %s not existed\n", ACCOUNT_FILE);
+	exit(0);
+}
+void updateFile() {
+	FILE* fOut;
+	fOut = fopen(ACCOUNT_FILE, "w");
+	if(!fOut) {
+		printf("File not exist??\n");
+		exitProgram();
+	}
+
+	User *ptr = head;
+
+    while (ptr != NULL) {
+        fprintf(fOut, "%s %s %d\n", ptr->username, ptr->password, ptr->status);    	
+    	ptr = ptr->next;
+    }
+
+    fclose(fOut);
+    return;
+}
+// read file account.txt
+void readFile() {
+	char username[254];
+	char password[32];
+	int status;
+	char c;
+	FILE* fIn;
+	fIn = fopen(ACCOUNT_FILE, "r");
+	if(!fIn) {
+		printf("File not exist??\n");
+		exitProgram();
+	}
+
+	while(!feof(fIn)) {
+		if(fscanf(fIn, "%s %s %d%c", username, password, &status, &c) != EOF) {
+			append(createNewUser(username, password, status));
+		}
+		if(feof(fIn)) break;
+	}
+	fclose(fIn);
+	return;
 }
 
 // register
@@ -107,6 +157,7 @@ int registerUser(char* username, char* password){
 	if(user == NULL){
 		user = createNewUser(username, password, ACTIVE);
 		append(user);
+		updateFile();
 		return REGISTER_SUCCESS;
 	}
 	return ACCOUNT_IS_EXIST;

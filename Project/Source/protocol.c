@@ -1,8 +1,11 @@
+#include "protocol.h"
+#include "status.h"
+
 int copyMess(Message* mess, Message temp) {
   mess->type = temp.type;
   mess->requestId = temp.requestId;
   mess->length = temp.length;
-  memcpy(mess->payload, temp.payload, temp.payload);
+  memcpy(mess->payload, temp.payload, temp.length);
   return 1;
 }
 
@@ -58,4 +61,70 @@ int receiveMessage(int socket, Message *msg){
   copyMess(&(*msg), recvMessage);
   
   return sizeof(Message);
+}
+
+char** str_split(char* a_str, const char a_delim)
+{
+    char** result    = 0;
+    size_t count     = 0;
+    char* tmp        = a_str;
+    char* last_comma = 0;
+    char delim[2];
+    delim[0] = a_delim;
+    delim[1] = 0;
+
+    /* Count how many elements will be extracted. */
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            last_comma = tmp;
+        }
+        tmp++;
+    }
+
+    /* Add space for trailing token. */
+    count += last_comma < (a_str + strlen(a_str) - 1);
+
+    /* Add space for terminating null string so caller
+       knows where the list of returned strings ends. */
+    count++;
+
+    result = malloc(sizeof(char*) * count);
+
+    if (result)
+    {
+        size_t idx  = 0;
+        char* token = strtok(a_str, delim);
+
+        while (token)
+        {
+            assert(idx < count);
+            *(result + idx++) = strdup(token);
+            token = strtok(0, delim);
+        }
+        assert(idx == count - 1);
+        *(result + idx) = 0;
+    }
+
+    return result;
+}
+
+char* getHeaderOfPayload(char* payload) {
+  if(strlen(payload)) 
+    return str_split(payload, '\n')[0];
+  return NULL;
+}
+
+void sendWithCode(Message mess, enum StatusCode code, int sockfd) {
+    char msgCode[200];
+    Message newMess = (Message) malloc(sizeof(Message));
+    newMess.type = mess.type;
+    newMess.requestId = mess.requestId;
+    strcpy(msgCode, messageCode(code));
+    snprintf(newMess.payload, 200, "%d ", code);
+    strcat(newMess.payload, msgCode);
+    newMess.length = strlen(newMess.payload);
+    sendMessage(sockfd, newMess);
 }

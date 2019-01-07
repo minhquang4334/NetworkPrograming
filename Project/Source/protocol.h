@@ -21,13 +21,16 @@
 #define PAYLOAD_SIZE 1024
 #define LENGTH_SIZE 2
 #define TIME_OUT 1200
-
+#define COMMAND_USER "USER"
+#define COMMAND_PASSWORD "PASS"
+#define COMMAND_LOGOUT "LOGOUT"
+#define COMMAND_REGISTER "REGISTER"
 
 typedef enum {
-	TYPE_AUTHENTICATE
-	TYPE_REQUEST_FILE
-	TYPE_REQUEST_DOWNLOAD
-	TYPE_UPLOAD_FILE
+	TYPE_AUTHENTICATE,
+	TYPE_REQUEST_FILE,
+	TYPE_REQUEST_DOWNLOAD,
+	TYPE_UPLOAD_FILE,
 	TYPE_ERROR
 } MessageType;
 
@@ -66,3 +69,9 @@ int sendMessage(int socket, Message msg);
 */
 int receiveMessage(int socket, Message *msg);
 
+char** str_split(char* a_str, const char a_delim);
+
+char* getHeaderOfPayload(char* payload);
+
+
+#endif
