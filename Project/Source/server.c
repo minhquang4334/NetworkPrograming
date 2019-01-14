@@ -47,34 +47,105 @@ void handleLogin(Message mess, int connSock) {
 	StatusCode loginCode;
 	if(numberElementsInArray(temp) == 3) {
 		char** userStr = str_split(temp[1], ' ');
-		char** passStr = str_split(temp[1], ' ');
-		if((numberElementsInArray(userStr) == 2) || (numberElementsInArray(passStr) == 2)) {
-			
-			if(!strcmp(userStr[0], COMMAND_USER) || !strcmp(passStr[0], COMMAND_PASSWORD)) {
+		char** passStr = str_split(temp[2], ' ');
+		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) {
+			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) {
 				char username[30];
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
 				loginCode = login(username, password);
+				if(loginCode!=LOGIN_SUCCESS)
+					mess.type=TYPE_ERROR;
+				else{
+					if(mess.requestId == 0) {
+						mess.requestId = requestId++;
+					}
+				}
 			}
+			else{
+				loginCode = COMMAND_INVALID;
+				mess.type=TYPE_ERROR;
+			}
+		}
+		else{
+			loginCode = COMMAND_INVALID;
+			mess.type=TYPE_ERROR;
 		}
 	}
 	else {
+		mess.type=TYPE_ERROR;
 		loginCode = COMMAND_INVALID;
 		printf("Fails on handle Login!!");
 	}
 	sendWithCode(mess, loginCode, connSock);
 }
 
+void handleRegister(Message mess, int connSock){
+	char** temp = str_split(mess.payload, '\n');
+	StatusCode registerCode;
+	if(numberElementsInArray(temp) == 3) {
+		char** userStr = str_split(temp[1], ' ');
+		char** passStr = str_split(temp[2], ' ');
+		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) {
+			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) {
+				char username[30];
+				char password[20];
+				strcpy(username, userStr[1]);
+				strcpy(password, passStr[1]);
+				registerCode = registerUser(username, password);
+				if(registerCode!=REGISTER_SUCCESS)
+					mess.type=TYPE_ERROR;
+				else{
+					if(mess.requestId == 0) {
+						mess.requestId = requestId++;
+					}
+				}
+			}
+			else{
+				registerCode = COMMAND_INVALID;
+				mess.type=TYPE_ERROR;
+			}
+		}
+		else{
+			registerCode = COMMAND_INVALID;
+			mess.type=TYPE_ERROR;
+		}
+	}
+	else {
+		mess.type=TYPE_ERROR;
+		registerCode = COMMAND_INVALID;
+		printf("Fails on handle Register!!");
+	}
+	sendWithCode(mess, registerCode, connSock);
+}
+
+void handleLogout(Message mess, int connSock){
+	char** temp = str_split(mess.payload, '\n');
+	StatusCode logoutCode;
+	if(numberElementsInArray(temp) != 1) {
+		mess.type=TYPE_ERROR;
+		logoutCode = COMMAND_INVALID;
+		printf("Fails on handle logout!!");
+	}
+	else{
+		logoutCode = logoutUser();
+	}
+	sendWithCode(mess, logoutCode, connSock);
+}
+
 void handleAuthenticateRequest(Message mess, int connSock) {
 	char* payloadHeader;
-	payloadHeader = getHeaderOfPayload(mess.payload);
-	if(strcmp(payloadHeader, LOGIN_CODE)) {
-		handleLogin(mess.payload, connSock);
-	} else if (strcmp(payloadHeader, REGISTER_CODE)) {
+	char temp[PAYLOAD_SIZE];
+	strcpy(temp, mess.payload);
+	payloadHeader = getHeaderOfPayload(temp);
+	if(!strcmp(payloadHeader, LOGIN_CODE)) {
+		handleLogin(mess, connSock);
+	} else if (!strcmp(payloadHeader, REGISTER_CODE)) {
+		handleRegister(mess, connSock);
 
-	} else if(strcmp(payloadHeader, LOGOUT_CODE)) {
-
+	} else if(!strcmp(payloadHeader, LOGOUT_CODE)) {
+		handleLogout(mess, connSock);
 	}
 }
 
@@ -87,31 +158,29 @@ void handleRequestFile(Message recvMess, int connSock) {
 * return void*
 */
 void* client_handler(void* conn_sock) {
-	char tmpFileName[100];
+	// char tmpFileName[100];
 	int bytes_received;
-	FILE *tmpFile;
+	// FILE *tmpFile = NULL;
 	int connSock;
 	// ProtocolStatus status = WAITING_KEYCODE;
 	connSock = *((int *) conn_sock);
-	Message recvMess, sendMess, keyMess;
+	Message recvMess;
+	// Message sendMess, keyMess;
 	
 	pthread_detach(pthread_self());
 	while(1){
 		//receives message from client
 		bytes_received = receiveMessage(connSock, &recvMess); //blocking
 		if (bytes_received <= 0) {
-			printf("\nConnection closed");
+			printf("\nConnection closed\n");
 			break;
-		}
-		if(recvMess.requestId == 0) {
-			recvMess.requestId = requestId;
 		}
 		switch(recvMess.type) {
 			case TYPE_AUTHENTICATE: 
 				handleAuthenticateRequest(recvMess, connSock);
 				break;
 			case TYPE_REQUEST_FILE: 
-				handleRequestFile(recvMess, connSock);
+				// handleRequestFile(recvMess, connSock);
 				break;
 			case TYPE_REQUEST_DOWNLOAD: 
 				break;

@@ -11,11 +11,9 @@
 #include <sys/uio.h>
 
 #include "protocol.h"
-#include "authenticate.h"
+// #include "authenticate.h"
 #include "validate.h"
 #include "status.h"
-
-#define BUFF_SIZE 1024
 #define NUMBEROFDOTSINIPV4 3 //number dots in ipv4
 #define NUMBEROFDOTSINIPV6 5 //number dots in ipv6
 char **tokens;
@@ -24,10 +22,10 @@ int client_sock;
 int under_client_sock;
 struct sockaddr_in server_addr; /* server's address information */
 
-User *current_user;
-int choose;
-Message mess;
-mess->requestId=0;
+char choose;
+Message *mess;
+int isOnline = 0;
+
 
 
 /*
@@ -43,60 +41,6 @@ int validNumber(char *value)
     return (atoi(value) > 0) && (atoi(value) <= 255);
 }
 
-/*
-* Split string
-* @param char* string
-* @param const char a_delim
-* @return boolean
-* source https://stackoverflow.com/questions/9210528/split-string-with-delimiters-in-c
-*/
-char** str_split(char* a_str, const char a_delim)
-{
-    char** result    = 0;
-    size_t count     = 0;
-    char* tmp        = a_str;
-    char* last_comma = 0;
-    char delim[2];
-    delim[0] = a_delim;
-    delim[1] = 0;
-
-    /* Count how many elements will be extracted. */
-    while (*tmp)
-    {
-        if (a_delim == *tmp)
-        {
-            count++;
-            last_comma = tmp;
-        }
-        tmp++;
-    }
-
-    /* Add space for trailing token. */
-    count += last_comma < (a_str + strlen(a_str) - 1);
-
-    /* Add space for terminating null string so caller
-       knows where the list of returned strings ends. */
-    count++;
-
-    result = malloc(sizeof(char*) * count);
-
-    if (result)
-    {
-        size_t idx  = 0;
-        char* token = strtok(a_str, delim);
-
-        while (token)
-        {
-            assert(idx < count);
-            *(result + idx++) = strdup(token);
-            token = strtok(0, delim);
-        }
-        assert(idx == count - 1);
-        *(result + idx) = 0;
-    }
-
-    return result;
-}
 /*
 * Check dots in string equals dots in ip address
 * @param char* string
@@ -156,7 +100,6 @@ int validPortNumber(int port) {
 * @return 1 has found ip address, else return 0
 */
 int hasIPAddress(char *ip) {
-    int i;
     struct in_addr ipv4addr;
     inet_pton(AF_INET, ip, &ipv4addr);
     struct hostent *host = gethostbyaddr(&ipv4addr, sizeof(ipv4addr), AF_INET);
@@ -208,21 +151,16 @@ void connectToServer(SocketType type){
 }
 
 // get username and password from keyboard to login
-char *getLoginInfo(char *buff){
+void getLoginInfo(char *str){
 	char username[255];
 	char password[255];
 	printf("Enter username?: ");
 	scanf("%s",username);
 	printf("Enter password?: ");
 	scanf("%s",password);
-	strcat("LOGIN",buff);
-	strcat("\n",buff);
-	strcat("User",buff);
-	strcat(username,buff);
-	strcat("\n",buff);
-	strcat("Pass",buff);
-	strcat(password,buff);
-	return username;
+	while(getchar()!='\n');
+	sprintf(mess->payload, "LOGIN\nUSER %s\nPASS %s", username, password);
+	strcpy(str, username);
 }
 
 // start method run on background to wait search and download file request
@@ -237,86 +175,150 @@ void UnderMethodClose(){
 }
 
 // download file func
-void downloadFileFunc(){
-	int i;
-	char **listUser;
-	listUser = str_split(mess.payload, ',');
-	printf("List username:\n");
-	for(i=0;i<listUser.length;i++){
-		printf("%d : %s\n",i+1, listUser[i]);
+// void downloadFileFunc(){
+// 	int i;
+// 	char **listUser;
+// 	listUser = str_split(mmakpayload, ',');
+// 	printf("List username:\n");
+// 	for(i=0;i<listUser.length;i++){
+// 		printf("%d : %s\n",i+1, listUser[i]);
+// 	}
+// 	printf("Choose user who you want download file from?\n");
+// 	scanf("%d", &choose);
+// 	if(choose<1||choose>listUser.length){
+// 		printf("Syntax error!\n");
+// 	}
+// 	else{
+// 		mess->type=TYPE_REQUEST_DOWNLOAD;
+// 		strcpy(mess->payload, listUser[i-1]);
+// 		sendMessage(client_sock, &m;
+// 		FILE *ptrFile;
+// 		while(1) {
+//             if(receiveMessage(client_sock, &recvMsg) <= 0) {
+//                 printf("Connection closed!\n");
+//                 check = 0;
+//                 break;
+//             }
+//             fwrite(recvMsg.payload, recvMsg.length, 1, fptr);
+//         }
+//         fclose(fptr);
+// 	}
+// }
+
+// // search file func
+// void searchFileFunc(){
+// 	char fileName[255];
+// 	printf("Enter file name?\n");
+// 	scanf("%s", fileName);
+// 	mess->type=TYPE_REQUEST_FILE;
+// 	strcpy(mess->payload,fileName);
+// 	mess->length = strlen(mess->payload);
+// 	sendMessage(client_sock,&mess);
+// 	receiveMessage(client_sock,mess);
+// 	if(mess->type==TYPE_ERROR){
+// 		printf("%s\n", mess->payload);
+// 	}
+// 	else downloadFileFunc();
+// }
+
+void loginFunc(){
+	char username[255];
+	mess->type = TYPE_AUTHENTICATE;
+	getLoginInfo(username);
+	mess->length=strlen(mess->payload);
+	sendMessage(client_sock, *mess);
+	receiveMessage(client_sock,mess);
+	if(mess->type!=TYPE_ERROR){
+		isOnline=1;
+		UnderMethodStart();
 	}
-	printf("Choose user who you want download file from?\n");
-	scanf("%d", &choose);
-	if(choose<1||choose>listUser.length){
-		printf("Syntax error!\n");
+	printf("%s\n", mess->payload);
+}
+
+int getRegisterInfo(char *user){
+	char username[255], password[255], confirmPass[255];
+	printf("Username: ");
+	scanf("%s", username);
+	printf("Password: ");
+	scanf("%s", password);
+	printf("Confirm password: ");
+	scanf("%s", confirmPass);
+	while(getchar()!='\n');
+	if(!strcmp(password, confirmPass)){
+		sprintf(mess->payload, "REGISTER\nUSER %s\nPASS %s", username, password);
+		strcpy(user, username);
+		return 1;
 	}
 	else{
-		mess->type=TYPE_REQUEST_DOWNLOAD;
-		strcpy(mess.payload, listUser[i-1]);
-		sendMessage(client_sock, mess);
-		FILE *ptrFile;
-		while(1) {
-            if(receiveMessage(client_sock, &recvMsg) <= 0) {
-                printf("Connection closed!\n");
-                check = 0;
-                break;
-            }
-            fwrite(recvMsg.payload, recvMsg.length, 1, fptr);
-        }
-        fclose(fptr);
+		printf("Confirm password invalid!\n");
+		return 0;
+	}
+	
+}
+
+void registerFunc(){
+	char username[255];
+	if(getRegisterInfo(username)){
+		mess->type=TYPE_AUTHENTICATE;
+		mess->length=strlen(mess->payload);
+		sendMessage(client_sock, *mess);
+		receiveMessage(client_sock,mess);
+		if(mess->type!=TYPE_ERROR){
+			isOnline=1;
+			UnderMethodStart();
+		}
+		printf("%s\n", mess->payload);
 	}
 }
 
-// search file func
-void searchFileFunc(){
-	char fileName[255];
-	printf("Enter file name?\n");
-	scanf("%s", fileName);
-	mess->type=TYPE_REQUEST_FILE;
-	mess->length=1;
-	strcpy(mess.payload,fileName);
-	sendMessage(client_sock,mess);
+void logoutFunc(){
+	mess->type=TYPE_AUTHENTICATE;
+	sprintf(mess->payload,"LOGOUT\n");
+	mess->length=strlen(mess->payload);
+	sendMessage(client_sock, *mess);
 	receiveMessage(client_sock,mess);
-	if(mess->type==TYPE_ERROR){
-		printf("%s\n", mess.payload);
+	if(mess->type!=TYPE_ERROR){
+		isOnline=0;
+		UnderMethodClose();
 	}
-	else downloadFileFunc();
+	printf("%s\n", mess->payload);
 }
-
 
 // communicate from client to server
 // send and recv message with server
 void communicateWithServer(){
-	char username[255];
 	while(1){
-		if(current_user==NULL){
-			printf("Login to connect to server!\n");
-			mess->type = TYPE_AUTHENTICATE;
-			mess->length=1;
-			username = getLoginInfo(mess.payload);
-			sendMessage(client_sock, mess);
-			receiveMessage(client_sock,mess);
-			if(mess->type==TYPE_ERROR){
-				printf("%s\n", mess.payload);
-			}
-			else{
-				printf("Login success!\n");
-				current_user = searchUser(username);
-				UnderMethodStart();
+		if(!isOnline){
+			printf("Choose 0 to login - 1 to register!\n");
+			scanf("%c", &choose);
+			while(getchar()!='\n');
+			switch (choose){
+				case '0':
+					loginFunc();
+					break;
+				case '1':
+					registerFunc();
+					break;
+				default:
+					printf("Syntax Error! Please choose again!\n");
 			}
 		}
 		else{
-			printf("Choose 1 to search file?? 0 to logout?\n");
-			scanf("%d", &choose);
-			if(choose==1)
-				searchFileFunc();
-			else if(choose==0){
-				logout(current_user);
-				current_user=NULL;
-				UnderMethodClose();
-			}
-			else{
-				printf("Syntax error!\n");
+			printf("Choose 1 to search file - 0 to logout?\n");
+			scanf("%c", &choose);
+			while(getchar()!='\n');
+			switch (choose){
+				case '0':
+					logoutFunc();
+					isOnline=0;
+					UnderMethodClose();
+					break;
+				case '1':
+					// searchFileFunc();
+					printf("search file func!\n");
+					break;
+				default:
+					printf("Syntax Error! Please choose again!\n");
 			}
 		}
 	}
@@ -338,6 +340,8 @@ int main(int argc, char const *argv[])
 	char *serAddr = malloc(sizeof(argv[1]) * strlen(argv[1]));
 	strcpy(serAddr, argv[1]);
 	int port = atoi(argv[2]);
+	mess = (Message*)malloc(sizeof(Message));
+	mess->requestId=0;
  	if(!validPortNumber(port)) {
  		perror("Invalid Port Number!\n");
  		exit(0);
@@ -363,6 +367,6 @@ int main(int argc, char const *argv[])
 	//Step 4: Communicate with server			
 	communicateWithServer();
 
-
+	close(client_sock);
 	return 0;
 }
