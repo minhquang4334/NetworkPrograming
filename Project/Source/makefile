@@ -2,7 +2,7 @@ CFLAGS = -c -Wall
 CC = gcc
 LIBS =  -lm
 
-all: server #client
+all: server client
 
 server: tcp-server protocol.o authenticate.o status.o validate.o
 	${CC} -pthread server.o protocol.o authenticate.o status.o validate.o -o server
@@ -27,6 +27,7 @@ status: status.c
 
 validate: validate.c
 	${CC} ${CFLAGS} validate.c
+
 
 clean:
 	rm -f *.o *~

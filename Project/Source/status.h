@@ -20,4 +20,13 @@ typedef enum {
 	SERVER_ERROR
 } StatusCode;
 
+typedef enum{
+	UNDER_SOCK,
+	SOCK
+} SocketType;
+
+typedef enum{
+	FILE_NOT_FOUND
+} FileCode;
+
 #endif

@@ -61,7 +61,7 @@ void getListUser(char* fileName);
 void updateListUser(char* fileName);
 
 // fucntional
-User* search(char *username) {
+User* searchUser(char *username) {
 	User *ptr = head;
 
     while (ptr != NULL) {
