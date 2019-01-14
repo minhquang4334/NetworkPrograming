@@ -5,7 +5,7 @@ int copyMess(Message* mess, Message temp) {
   mess->type = temp.type;
   mess->requestId = temp.requestId;
   mess->length = temp.length;
-  memcpy(mess->payload, temp.payload, temp.length);
+  memcpy(mess->payload, temp.payload, temp.length+1);
   return 1;
 }
 
@@ -35,7 +35,6 @@ int receiveMessage(int socket, Message *msg){
   char recvBuff[BUFF_SIZE];
   int ret, nLeft, idx, bytes_recv;
   Message recvMessage;
-
   // init value for variables
   ret = 0;
   idx = 0;
@@ -59,7 +58,6 @@ int receiveMessage(int socket, Message *msg){
 
   // copy message to msg
   copyMess(&(*msg), recvMessage);
-  
   return sizeof(Message);
 }
 
@@ -117,14 +115,14 @@ char* getHeaderOfPayload(char* payload) {
   return NULL;
 }
 
-void sendWithCode(Message mess, enum StatusCode code, int sockfd) {
+void sendWithCode(Message mess,StatusCode code, int sockfd) {
     char msgCode[200];
-    Message newMess = (Message) malloc(sizeof(Message));
-    newMess.type = mess.type;
-    newMess.requestId = mess.requestId;
-    strcpy(msgCode, messageCode(code));
-    snprintf(newMess.payload, 200, "%d ", code);
-    strcat(newMess.payload, msgCode);
-    newMess.length = strlen(newMess.payload);
-    sendMessage(sockfd, newMess);
+    Message *newMess = (Message*)malloc(sizeof(Message));
+    newMess->type = mess.type;
+    newMess->requestId = mess.requestId;
+    messageCode(code, msgCode);
+    sprintf(newMess->payload,"%d : %s", code, msgCode);
+    // strcat(newMess->payload, msgCode);
+    newMess->length = strlen(newMess->payload);
+    sendMessage(sockfd, *newMess);
 }

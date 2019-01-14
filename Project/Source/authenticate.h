@@ -76,7 +76,7 @@ int login(char* username, char* password);
 int registerUser(char* username, char* password);
 
 // logout
-int logout(User* user);
+int logoutUser();
 
 #endif
 

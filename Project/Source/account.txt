@@ -10,3 +10,8 @@ hoangminh quang 1
 hq 1 1
 dad 2 0
 dep quang 1
+a a 1
+v v 1
+u u 1
+c c 1
+m m 1

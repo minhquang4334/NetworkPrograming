@@ -29,4 +29,5 @@ typedef enum{
 	FILE_NOT_FOUND
 } FileCode;
 
+void messageCode(StatusCode code, char *msg);
 #endif
