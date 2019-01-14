@@ -64,7 +64,7 @@ void getListUser(char* fileName);
 void updateListUser(char* fileName);
 
 // fucntional
-User* search(char *username);
+User* searchUser(char *username);
 
 // compare password 
 int identifyPassWord(User* user, char* password);

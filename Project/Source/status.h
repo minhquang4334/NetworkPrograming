@@ -25,4 +25,8 @@ typedef enum{
 	SOCK
 } SocketType;
 
+typedef enum{
+	FILE_NOT_FOUND
+} FileCode;
+
 #endif

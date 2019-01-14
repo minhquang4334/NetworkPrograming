@@ -10,9 +10,9 @@
 #include <assert.h>
 #include <sys/uio.h>
 
-// #include "protocol.h"
-// #include "authenticate.h"
-// #include "validate.h"
+#include "protocol.h"
+#include "authenticate.h"
+#include "validate.h"
 #include "status.h"
 
 #define BUFF_SIZE 1024
@@ -23,6 +23,11 @@ char **tokens;
 int client_sock;
 int under_client_sock;
 struct sockaddr_in server_addr; /* server's address information */
+
+User *current_user;
+int choose;
+Message mess;
+mess->requestId=0;
 
 
 /*
@@ -202,6 +207,121 @@ void connectToServer(SocketType type){
 	}
 }
 
+// get username and password from keyboard to login
+char *getLoginInfo(char *buff){
+	char username[255];
+	char password[255];
+	printf("Enter username?: ");
+	scanf("%s",username);
+	printf("Enter password?: ");
+	scanf("%s",password);
+	strcat("LOGIN",buff);
+	strcat("\n",buff);
+	strcat("User",buff);
+	strcat(username,buff);
+	strcat("\n",buff);
+	strcat("Pass",buff);
+	strcat(password,buff);
+	return username;
+}
+
+// start method run on background to wait search and download file request
+void UnderMethodStart(){
+	under_client_sock=initSock();
+	connectToServer(UNDER_SOCK);
+}
+
+// close method run on background
+void UnderMethodClose(){
+	close(under_client_sock);
+}
+
+// download file func
+void downloadFileFunc(){
+	int i;
+	char **listUser;
+	listUser = str_split(mess.payload, ',');
+	printf("List username:\n");
+	for(i=0;i<listUser.length;i++){
+		printf("%d : %s\n",i+1, listUser[i]);
+	}
+	printf("Choose user who you want download file from?\n");
+	scanf("%d", &choose);
+	if(choose<1||choose>listUser.length){
+		printf("Syntax error!\n");
+	}
+	else{
+		mess->type=TYPE_REQUEST_DOWNLOAD;
+		strcpy(mess.payload, listUser[i-1]);
+		sendMessage(client_sock, mess);
+		FILE *ptrFile;
+		while(1) {
+            if(receiveMessage(client_sock, &recvMsg) <= 0) {
+                printf("Connection closed!\n");
+                check = 0;
+                break;
+            }
+            fwrite(recvMsg.payload, recvMsg.length, 1, fptr);
+        }
+        fclose(fptr);
+	}
+}
+
+// search file func
+void searchFileFunc(){
+	char fileName[255];
+	printf("Enter file name?\n");
+	scanf("%s", fileName);
+	mess->type=TYPE_REQUEST_FILE;
+	mess->length=1;
+	strcpy(mess.payload,fileName);
+	sendMessage(client_sock,mess);
+	receiveMessage(client_sock,mess);
+	if(mess->type==TYPE_ERROR){
+		printf("%s\n", mess.payload);
+	}
+	else downloadFileFunc();
+}
+
+
+// communicate from client to server
+// send and recv message with server
+void communicateWithServer(){
+	char username[255];
+	while(1){
+		if(current_user==NULL){
+			printf("Login to connect to server!\n");
+			mess->type = TYPE_AUTHENTICATE;
+			mess->length=1;
+			username = getLoginInfo(mess.payload);
+			sendMessage(client_sock, mess);
+			receiveMessage(client_sock,mess);
+			if(mess->type==TYPE_ERROR){
+				printf("%s\n", mess.payload);
+			}
+			else{
+				printf("Login success!\n");
+				current_user = searchUser(username);
+				UnderMethodStart();
+			}
+		}
+		else{
+			printf("Choose 1 to search file?? 0 to logout?\n");
+			scanf("%d", &choose);
+			if(choose==1)
+				searchFileFunc();
+			else if(choose==0){
+				logout(current_user);
+				current_user=NULL;
+				UnderMethodClose();
+			}
+			else{
+				printf("Syntax error!\n");
+			}
+		}
+	}
+}
+
 /*
 * Main function
 * @param int argc, char** argv
@@ -240,6 +360,9 @@ int main(int argc, char const *argv[])
 	//Step 3: Request to connect server
 	connectToServer(SOCK);
 
-	// Step 4: communicate with server
+	//Step 4: Communicate with server			
+	communicateWithServer();
+
+
 	return 0;
 }
