@@ -1,4 +1,3 @@
-
 #include <stdio.h>          /* These are the usual header files */
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -43,98 +42,120 @@ int numberElementsInArray(char** temp) {
     return i;
 }
 
-User* handleLogin(Message mess, int connSock) {
+void handleLogin(Message mess, int connSock) {
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode loginCode;
 	User* curUser = NULL;
 	if(numberElementsInArray(temp) == 3) {
 		char** userStr = str_split(temp[1], ' ');
-		char** passStr = str_split(temp[1], ' ');
-		if((numberElementsInArray(userStr) == 2) || (numberElementsInArray(passStr) == 2)) {
-			if(!strcmp(userStr[0], COMMAND_USER) || !strcmp(passStr[0], COMMAND_PASSWORD)) {
+		char** passStr = str_split(temp[2], ' ');
+		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) {
+			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) {
 				char username[30];
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
 				if(validateUsername(username) && validatePassword(password)) {
+
 					loginCode = login(username, password);
-					if(loginCode == LOGIN_SUCCESS) {
-						curUser = search(username);
+					if(loginCode!=LOGIN_SUCCESS)
+						mess.type=TYPE_ERROR;
+					else{
+						if(mess.requestId == 0) {
+							mess.requestId = requestId++;
+						}
 					}
 				} else {
 					loginCode = USERNAME_OR_PASSWORD_INVALID;
 				}
 			}
+			else{
+				loginCode = COMMAND_INVALID;
+				mess.type=TYPE_ERROR;
+			}
+		}
+		else{
+			loginCode = COMMAND_INVALID;
+			mess.type=TYPE_ERROR;
 		}
 	}
 	else {
+		mess.type=TYPE_ERROR;
 		loginCode = COMMAND_INVALID;
 		printf("Fails on handle Login!!");
 	}
 	sendWithCode(mess, loginCode, connSock);
-
-	return curUser;
 }
 
-User* handleRegister(Message mess, int connSock) {
+void handleRegister(Message mess, int connSock){
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode registerCode;
-	User* curUser = NULL;
 	if(numberElementsInArray(temp) == 3) {
 		char** userStr = str_split(temp[1], ' ');
-		char** passStr = str_split(temp[1], ' ');
-		if((numberElementsInArray(userStr) == 2) || (numberElementsInArray(passStr) == 2)) {
-			if(!strcmp(userStr[0], COMMAND_USER) || !strcmp(passStr[0], COMMAND_PASSWORD)) {
+		char** passStr = str_split(temp[2], ' ');
+		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) {
+			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) {
 				char username[30];
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
 				if(validateUsername(username) && validatePassword(password)) {
 					registerCode = registerUser(username, password);
-					if(loginCode == REGISTER_SUCCESS) {
-						curUser = search(username);
+					if(registerCode!=REGISTER_SUCCESS)
+						mess.type=TYPE_ERROR;
+					else{
+						if(mess.requestId == 0) {
+							mess.requestId = requestId++;
+						}
 					}
 				} else {
 					registerCode = USERNAME_OR_PASSWORD_INVALID;
 				}
 			}
+			else{
+				registerCode = COMMAND_INVALID;
+				mess.type=TYPE_ERROR;
+			}
+		}
+		else{
+			registerCode = COMMAND_INVALID;
+			mess.type=TYPE_ERROR;
 		}
 	}
 	else {
+		mess.type=TYPE_ERROR;
 		registerCode = COMMAND_INVALID;
 		printf("Fails on handle Register!!");
 	}
 	sendWithCode(mess, registerCode, connSock);
-
-	return curUser;
 }
 
-void handleLogout(Message mess, int connSock, User* user) {
-	char msgCode[20];
+void handleLogout(Message mess, int connSock){
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode logoutCode;
-	if(numberElementsInArray(temp) == 1) {
-		strcpy(msgCode, temp[0]);
-		if(!strcmp(msgCode, COMMAND_LOGOUT)) {
-			logoutCode = logout(user);
-		}
-	}
-	else {
+	if(numberElementsInArray(temp) != 2) {
+		mess.type=TYPE_ERROR;
 		logoutCode = COMMAND_INVALID;
-		printf("Fails on handle Logout!!");
+		printf("Fails on handle logout!!");
 	}
-	sendWithCode(mess, registerCode, connSock);
+	else{
+		logoutCode = logoutUser(temp[1]);
+	}
+	sendWithCode(mess, logoutCode, connSock);
 }
 
-void handleAuthenticateRequest(Message mess, int connSock, User** user) {
+void handleAuthenticateRequest(Message mess, int connSock) {
 	char* payloadHeader;
-	payloadHeader = getHeaderOfPayload(mess.payload);
-	if(strcmp(payloadHeader, LOGIN_CODE)) {
-		*user = handleLogin(mess, connSock);
-	} else if (strcmp(payloadHeader, REGISTER_CODE)) {
-		*user = handleRegister(mess, connSock);
-	} else if(strcmp(payloadHeader, LOGOUT_CODE)) {
-		handleLogout(mess, connSock, *user);
+	char temp[PAYLOAD_SIZE];
+	strcpy(temp, mess.payload);
+	payloadHeader = getHeaderOfPayload(temp);
+	if(!strcmp(payloadHeader, LOGIN_CODE)) {
+		handleLogin(mess, connSock);
+	} else if (!strcmp(payloadHeader, REGISTER_CODE)) {
+		handleRegister(mess, connSock);
+
+	} else if(!strcmp(payloadHeader, LOGOUT_CODE)) {
+		handleLogout(mess, connSock);
 	}
 }
 
@@ -147,32 +168,29 @@ void handleRequestFile(Message recvMess, int connSock) {
 * return void*
 */
 void* client_handler(void* conn_sock) {
-	char tmpFileName[100];
+	// char tmpFileName[100];
 	int bytes_received;
-	FILE *tmpFile;
+	// FILE *tmpFile = NULL;
 	int connSock;
 	// ProtocolStatus status = WAITING_KEYCODE;
 	connSock = *((int *) conn_sock);
-	Message recvMess, sendMess, keyMess;
-	User* currentUser;
+	Message recvMess;
+	// Message sendMess, keyMess;
 	
 	pthread_detach(pthread_self());
 	while(1) {
 		//receives message from client
 		bytes_received = receiveMessage(connSock, &recvMess); //blocking
 		if (bytes_received <= 0) {
-			printf("\nConnection closed");
+			printf("\nConnection closed\n");
 			break;
-		}
-		if(recvMess.requestId == 0) {
-			recvMess.requestId = requestId;
 		}
 		switch(recvMess.type) {
 			case TYPE_AUTHENTICATE: 
 				handleAuthenticateRequest(recvMess, connSock, &currentUser);
 				break;
 			case TYPE_REQUEST_FILE: 
-				handleRequestFile(recvMess, connSock);
+				// handleRequestFile(recvMess, connSock);
 				break;
 			case TYPE_REQUEST_DOWNLOAD: 
 				break;

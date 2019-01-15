@@ -22,7 +22,6 @@
 #define REGISTER_CODE "REGISTER"
 
 typedef struct user {
-	int id;
 	char username[32];
 	char password[32];
 	int status;
@@ -64,7 +63,7 @@ void getListUser(char* fileName);
 void updateListUser(char* fileName);
 
 // fucntional
-User* search(char *username);
+User* searchUser(char *username);
 
 // compare password 
 int identifyPassWord(User* user, char* password);
@@ -76,7 +75,7 @@ int login(char* username, char* password);
 int registerUser(char* username, char* password);
 
 // logout
-int logout(User* user);
+int logoutUser();
 
 #endif
 

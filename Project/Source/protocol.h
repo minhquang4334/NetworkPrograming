@@ -16,6 +16,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <assert.h>
+#include "status.h"
 
 #define BUFF_SIZE 2000
 #define PAYLOAD_SIZE 1024
@@ -34,7 +36,7 @@ typedef enum {
 	TYPE_ERROR
 } MessageType;
 
-typedef struct {
+typedef struct Message{
 	MessageType type;
 	int requestId;
 	int length;
@@ -73,5 +75,6 @@ char** str_split(char* a_str, const char a_delim);
 
 char* getHeaderOfPayload(char* payload);
 
+void sendWithCode(Message mess,StatusCode code, int sockfd);
 
 #endif

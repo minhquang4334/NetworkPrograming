@@ -17,7 +17,6 @@ User *createNewUser(char* username, char* password, int status) {
 // print List users
 void printList() {
     User *ptr = head;
-
     while (ptr != NULL) {
         printf("Username: %s\n", ptr->username);
         printf("Status: %s\n", ((ptr->status == ACTIVE) ? "Active" : "Blocked"));
@@ -26,7 +25,6 @@ void printList() {
 
         ptr = ptr->next;
     }
-    return;
 }
 
 // add user to end of list
@@ -40,7 +38,6 @@ void append(User* newUser) {
 		current->next = newUser;
 		current = newUser;
  	}
-	return;
 }
 
 // ad user to beginning of list
@@ -61,9 +58,8 @@ void getListUser(char* fileName);
 void updateListUser(char* fileName);
 
 // fucntional
-User* search(char *username) {
+User* searchUser(char *username) {
 	User *ptr = head;
-
     while (ptr != NULL) {
     	if(!strcmp(ptr->username, username)) break;
         ptr = ptr->next;
@@ -79,16 +75,16 @@ int identifyPassWord(User* user, char* password){
 }
 
 int isOnline(char *username){
-	User *user = search(username);
+	User *user = searchUser(username);
 	return user->isLogin;
 }
 // login
 int login(char* username, char* password){
-	User *user = search(username);
+	User *user = searchUser(username);
 	if(user == NULL) return USER_NOT_FOUND;
 	else{
 		if(isOnline(username)) return USER_IS_ONLINE;
-		else if(user->countFails < MAX_LOGIN_FAILS){
+		else if(user->status == ACTIVE){
 			if(!identifyPassWord(user, password)){
 				user->isLogin = ONLINE;
 				user->countFails = 0;
@@ -110,6 +106,7 @@ void exitProgram() {
 	printf("End Program : File %s not existed\n", ACCOUNT_FILE);
 	exit(0);
 }
+
 void updateFile() {
 	FILE* fOut;
 	fOut = fopen(ACCOUNT_FILE, "w");
@@ -153,7 +150,7 @@ void readFile() {
 
 // register
 int registerUser(char* username, char* password){
-	User *user = search(username);
+	User *user = searchUser(username);
 	if(user == NULL){
 		user = createNewUser(username, password, ACTIVE);
 		append(user);
@@ -163,14 +160,15 @@ int registerUser(char* username, char* password){
 	return ACCOUNT_IS_EXIST;
 }
 
-// logout
-int logout(User* user){
-	if(user->isLogin == ONLINE) {
-		user->isLogin = OFFLINE;
-		return LOGOUT_SUCCESS;
+int logoutUser(char *username){
+	User *ptr=head;
+	while(ptr!=NULL){
+		if(!strcmp(ptr->username,username)){
+			ptr->isLogin=OFFLINE;
+			return LOGOUT_SUCCESS;
+		}
+		ptr = ptr->next;
 	}
-	else {
-		return COMMAND_INVALID;
-	}
+	return SERVER_ERROR;
 }
 

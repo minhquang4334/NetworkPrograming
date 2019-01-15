@@ -21,4 +21,14 @@ typedef enum {
 	SERVER_ERROR = 500
 } StatusCode;
 
+typedef enum{
+	UNDER_SOCK,
+	SOCK
+} SocketType;
+
+typedef enum{
+	FILE_NOT_FOUND
+} FileCode;
+
+void messageCode(StatusCode code, char *msg);
 #endif
