@@ -221,7 +221,7 @@ void UnderMethodClose(){
 // 	else downloadFileFunc();
 // }
 
-void loginFunc(){
+void loginFunc(char *current_user){
 	char username[255];
 	mess->type = TYPE_AUTHENTICATE;
 	getLoginInfo(username);
@@ -230,6 +230,7 @@ void loginFunc(){
 	receiveMessage(client_sock,mess);
 	if(mess->type!=TYPE_ERROR){
 		isOnline=1;
+		strcpy(current_user, username);
 		UnderMethodStart();
 	}
 	printf("%s\n", mess->payload);
@@ -256,7 +257,7 @@ int getRegisterInfo(char *user){
 	
 }
 
-void registerFunc(){
+void registerFunc(char *current_user){
 	char username[255];
 	if(getRegisterInfo(username)){
 		mess->type=TYPE_AUTHENTICATE;
@@ -265,20 +266,22 @@ void registerFunc(){
 		receiveMessage(client_sock,mess);
 		if(mess->type!=TYPE_ERROR){
 			isOnline=1;
+			strcpy(current_user, username);
 			UnderMethodStart();
 		}
 		printf("%s\n", mess->payload);
 	}
 }
 
-void logoutFunc(){
+void logoutFunc(char *current_user){
 	mess->type=TYPE_AUTHENTICATE;
-	sprintf(mess->payload,"LOGOUT\n");
+	sprintf(mess->payload,"LOGOUT\n%s",current_user);
 	mess->length=strlen(mess->payload);
 	sendMessage(client_sock, *mess);
 	receiveMessage(client_sock,mess);
 	if(mess->type!=TYPE_ERROR){
 		isOnline=0;
+		current_user[0]='\0';
 		UnderMethodClose();
 	}
 	printf("%s\n", mess->payload);
@@ -287,6 +290,7 @@ void logoutFunc(){
 // communicate from client to server
 // send and recv message with server
 void communicateWithServer(){
+	char current_user[255];
 	while(1){
 		if(!isOnline){
 			printf("Choose 0 to login - 1 to register!\n");
@@ -294,10 +298,10 @@ void communicateWithServer(){
 			while(getchar()!='\n');
 			switch (choose){
 				case '0':
-					loginFunc();
+					loginFunc(current_user);
 					break;
 				case '1':
-					registerFunc();
+					registerFunc(current_user);
 					break;
 				default:
 					printf("Syntax Error! Please choose again!\n");
@@ -309,7 +313,7 @@ void communicateWithServer(){
 			while(getchar()!='\n');
 			switch (choose){
 				case '0':
-					logoutFunc();
+					logoutFunc(current_user);
 					isOnline=0;
 					UnderMethodClose();
 					break;

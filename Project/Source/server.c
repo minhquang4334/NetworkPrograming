@@ -123,13 +123,13 @@ void handleRegister(Message mess, int connSock){
 void handleLogout(Message mess, int connSock){
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode logoutCode;
-	if(numberElementsInArray(temp) != 1) {
+	if(numberElementsInArray(temp) != 2) {
 		mess.type=TYPE_ERROR;
 		logoutCode = COMMAND_INVALID;
 		printf("Fails on handle logout!!");
 	}
 	else{
-		logoutCode = logoutUser();
+		logoutCode = logoutUser(temp[1]);
 	}
 	sendWithCode(mess, logoutCode, connSock);
 }
