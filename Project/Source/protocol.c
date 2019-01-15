@@ -16,7 +16,7 @@ int printMess(Message mess) {
   return 1;
 }
 
-int sendMessage(int socket, Message msg){
+int sendMsg(int socket, Message msg){
   int dataLength, nLeft, idx;
   nLeft = sizeof(Message);
   idx = 0;
@@ -30,7 +30,7 @@ int sendMessage(int socket, Message msg){
   return sizeof(Message);
 }
 
-int receiveMessage(int socket, Message *msg){
+int recvMsg(int socket, Message *msg){
 
   char recvBuff[BUFF_SIZE];
   int ret, nLeft, idx, bytes_recv;
@@ -59,6 +59,26 @@ int receiveMessage(int socket, Message *msg){
   // copy message to msg
   copyMess(&(*msg), recvMessage);
   return sizeof(Message);
+}
+
+int sendMessage(int conn_sock, Message msg) {
+  int bytes_sent = sendMsg(conn_sock, msg);
+  if(bytes_sent <= 0){
+    printf("\nConnection closed!\n");
+    close(conn_sock);
+    return -1;
+  }
+  return 1;
+}
+
+int receiveMessage(int conn_sock, Message *msg) {
+  int bytes_received;
+  bytes_received = recvMsg(conn_sock, msg);
+  if (bytes_received <= 0){
+    printf("\nConnection closed");
+    return -1;
+  }
+  return 1;
 }
 
 char** str_split(char* a_str, const char a_delim)

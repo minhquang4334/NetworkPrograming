@@ -16,4 +16,13 @@ int validateUsername(char* username);
 //
 int validatePassword(char* password);
 
+int validNumber(char *value);
+
+int checkDots(char *str);
+
+int checkIP(char *str);
+
+int validPortNumber(int port);
+
+int hasIPAddress(char *ip);
 #endif

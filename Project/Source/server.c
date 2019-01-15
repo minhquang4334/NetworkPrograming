@@ -24,14 +24,7 @@
 #define BUFF_SEND 1024
 #define PRIVATE_KEY 256
 int requestId = 1;
-/*
-* Check valid port number
-* @param int port
-* @return 1 if valid port number, else return 0
-*/
-int validPortNumber(int port) {
-	return (port > 0) && (port <= 65535);
-}
+
 // count number param of command
 int numberElementsInArray(char** temp) {
 	int i;
@@ -45,7 +38,7 @@ int numberElementsInArray(char** temp) {
 void handleLogin(Message mess, int connSock) {
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode loginCode;
-	User* curUser = NULL;
+	//User* curUser = NULL;
 	if(numberElementsInArray(temp) == 3) {
 		char** userStr = str_split(temp[1], ' ');
 		char** passStr = str_split(temp[2], ' ');
@@ -55,17 +48,17 @@ void handleLogin(Message mess, int connSock) {
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
-				if(validateUsername(username) && validatePassword(password)) {
-
+				if(validateUsername(username) || validatePassword(password)) {
 					loginCode = login(username, password);
-					if(loginCode!=LOGIN_SUCCESS)
-						mess.type=TYPE_ERROR;
+					if(loginCode != LOGIN_SUCCESS)
+						mess.type = TYPE_ERROR;
 					else{
 						if(mess.requestId == 0) {
 							mess.requestId = requestId++;
 						}
 					}
 				} else {
+					mess.type = TYPE_ERROR;
 					loginCode = USERNAME_OR_PASSWORD_INVALID;
 				}
 			}
@@ -99,7 +92,7 @@ void handleRegister(Message mess, int connSock){
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
-				if(validateUsername(username) && validatePassword(password)) {
+				if(validateUsername(username) || validatePassword(password)) {
 					registerCode = registerUser(username, password);
 					if(registerCode!=REGISTER_SUCCESS)
 						mess.type=TYPE_ERROR;
@@ -109,6 +102,7 @@ void handleRegister(Message mess, int connSock){
 						}
 					}
 				} else {
+					mess.type = TYPE_ERROR;
 					registerCode = USERNAME_OR_PASSWORD_INVALID;
 				}
 			}
@@ -168,26 +162,20 @@ void handleRequestFile(Message recvMess, int connSock) {
 * return void*
 */
 void* client_handler(void* conn_sock) {
-	// char tmpFileName[100];
-	int bytes_received;
-	// FILE *tmpFile = NULL;
 	int connSock;
-	// ProtocolStatus status = WAITING_KEYCODE;
 	connSock = *((int *) conn_sock);
 	Message recvMess;
-	// Message sendMess, keyMess;
 	
 	pthread_detach(pthread_self());
 	while(1) {
 		//receives message from client
-		bytes_received = receiveMessage(connSock, &recvMess); //blocking
-		if (bytes_received <= 0) {
-			printf("\nConnection closed\n");
+		if(receiveMessage(connSock, &recvMess) < 0) {
 			break;
 		}
+		//blocking
 		switch(recvMess.type) {
 			case TYPE_AUTHENTICATE: 
-				handleAuthenticateRequest(recvMess, connSock, &currentUser);
+				handleAuthenticateRequest(recvMess, connSock);
 				break;
 			case TYPE_REQUEST_FILE: 
 				// handleRequestFile(recvMess, connSock);

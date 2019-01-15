@@ -1,5 +1,7 @@
 #include "authenticate.h"
 #include "status.h"
+
+
 User *head = NULL;
 User *current = NULL;
 // create new user from username, password, status
