@@ -160,10 +160,10 @@ int registerUser(char* username, char* password){
 }
 
 // logout
-int logoutUser(){
+int logoutUser(char *username){
 	User *ptr=head;
 	while(ptr!=NULL){
-		if(ptr->isLogin==ONLINE){
+		if(!strcmp(ptr->username,username)){
 			ptr->isLogin=OFFLINE;
 			return LOGOUT_SUCCESS;
 		}

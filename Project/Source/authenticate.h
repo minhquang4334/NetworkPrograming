@@ -22,7 +22,6 @@
 #define REGISTER_CODE "REGISTER"
 
 typedef struct user {
-	int id;
 	char username[32];
 	char password[32];
 	int status;
