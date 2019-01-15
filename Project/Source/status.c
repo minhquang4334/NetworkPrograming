@@ -26,6 +26,8 @@ char* messageCode(enum StatusCode code) {
     break;
     case COMMAND_INVALID: strcpy(msg, "Command was invalid!!");
     break;
+    case USERNAME_OR_PASSWORD_INVALID: strcpy(msg, "Username or Password invalid!!");
+    break
     // server error message
     case SERVER_ERROR: strcpy(msg, "Something error!!");
     break;

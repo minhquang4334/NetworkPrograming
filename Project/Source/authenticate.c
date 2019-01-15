@@ -165,7 +165,12 @@ int registerUser(char* username, char* password){
 
 // logout
 int logout(User* user){
-	user->isLogin = OFFLINE;
-	return LOGOUT_SUCCESS;
+	if(user->isLogin == ONLINE) {
+		user->isLogin = OFFLINE;
+		return LOGOUT_SUCCESS;
+	}
+	else {
+		return COMMAND_INVALID;
+	}
 }
 
