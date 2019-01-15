@@ -9,16 +9,19 @@
 #include <unistd.h>
 #include <assert.h>
 #include <sys/uio.h>
+#include <pthread.h>
+#include <dirent.h>
+
 
 #include "protocol.h"
 // #include "authenticate.h"
 #include "validate.h"
 #include "status.h"
-
+char current_user[255];
 int client_sock;
 int under_client_sock;
 struct sockaddr_in server_addr; /* server's address information */
-
+pthread_t tid;
 char choose;
 Message *mess;
 int isOnline = 0;
@@ -43,6 +46,14 @@ void bindClient(int port, char *serverAddr){
 }
 
 
+void* backgroundHandle() {
+	// hanlde request in background
+}
+
+void pingServerToConfirmBackgroundThread() {
+	mess->type = TYPE_BACKGROUND;
+	sendMessage(under_client_sock, *mess);
+}
 // connect client to server
 // parameter: client socket, server address
 // if have error, print error and exit
@@ -51,6 +62,9 @@ void connectToServer(SocketType type){
 		if(connect(under_client_sock, (struct sockaddr*) (&server_addr), sizeof(struct sockaddr)) < 0){
 			printf("\nError!Can not connect to sever! Client exit imediately!\n");
 			exit(0);
+		} else {
+			pingServerToConfirmBackgroundThread();
+			pthread_create(&tid, NULL, &backgroundHandle, NULL);
 		}
 	}
 	else{
@@ -60,6 +74,18 @@ void connectToServer(SocketType type){
 		}
 	}
 }
+
+// start method run on background to wait search and download file request
+void backgroundHandleStart(){
+	under_client_sock = initSock();
+	connectToServer(UNDER_SOCK);
+}
+
+// close method run on background
+void backgroundHandleEnd(){
+	close(under_client_sock);
+}
+
 
 // get username and password from keyboard to login
 void getLoginInfo(char *str){
@@ -82,9 +108,9 @@ void loginFunc(char *current_user){
 	sendMessage(client_sock, *mess);
 	receiveMessage(client_sock, mess);
 	if(mess->type != TYPE_ERROR){
-		isOnline=1;
+		isOnline = 1;
 		strcpy(current_user, username);
-		//UnderMethodStart();
+		backgroundHandleStart();
 	}
 	printf("%s\n", mess->payload);
 }
@@ -120,7 +146,7 @@ void registerFunc(char *current_user){
 		if(mess->type != TYPE_ERROR){
 			isOnline = 1;
 			strcpy(current_user, username);
-			//UnderMethodStart();
+			backgroundHandleStart();
 		}
 		printf("%s\n", mess->payload);
 	}
@@ -135,50 +161,113 @@ void logoutFunc(char *current_user){
 	if(mess->type != TYPE_ERROR){
 		isOnline = 0;
 		current_user[0] = '\0';
-		//UnderMethodClose();
+		backgroundHandleEnd();
 	}
 	printf("%s\n", mess->payload);
 }
 
+void menuAuthenticate() {
+	printf("\n---------------FileShareSystem-------------\n");
+	printf("\n1 - Login");
+	printf("\n2 - Register");
+	printf("\n3 - Exit");
+	printf("\nPlease choose: ");
+}
+
+void mainMenu() {
+	printf("\n---------------FileShareSystem-------------\n");
+	printf("\n1 - Search File In Shared System");
+	printf("\n2 - View Your List Files");
+	printf("\n3 - Logout");
+	printf("\nPlease choose: ");
+}
+
+void authenticateFunc() {
+	menuAuthenticate();
+	scanf("%c", &choose);
+	while(getchar() != '\n');
+	switch (choose){
+		case '1':
+			loginFunc(current_user);
+			break;
+		case '2':
+			registerFunc(current_user);
+			break;
+		case '3': 
+			exit(0);
+		default:
+			printf("Syntax Error! Please choose again!\n");
+	}
+	
+}
+
+void showListFile() {
+	DIR *dir;
+	struct dirent *ent;
+	if ((dir = opendir (".")) != NULL) {
+	  /* print all the files and directories within directory */
+	  while ((ent = readdir (dir)) != NULL) {
+	    printf ("%s\n", ent->d_name);
+	  }
+	  closedir (dir);
+	} else {
+	  /* could not open directory */
+	  perror ("Permission denied!!");
+	}
+}
+void handleSearchFile() {
+	char fileName[100];
+	char choose[20];
+	int isSearchFile = 1;
+	printf("Please Input File Name You Want To Search: ");
+	scanf("%[^\n]s", fileName);
+	while(getchar() != '\n');
+	// FILE *fptr;
+	// fptr = fopen(fileName, "r");
+	// if(fptr != NULL) {
+	// 	printf("\nYou have a file with same name!\n -- Are you want to continue search? y/n: ");
+	// 	while(1) {
+	// 		scanf("%s", &choose);
+	// 		while(getchar() != '\n');
+	// 	}
+	// }
+}
+
+void requestFileFunc() {
+	mainMenu();
+	scanf("%c", &choose);
+	while(getchar() != '\n');
+	switch (choose) {
+		case '1':
+			handleSearchFile();
+			printf("search file func!\n");
+			break;
+		case '2':
+			// searchFileFunc();
+			showListFile();
+			break;
+		case '3':
+			logoutFunc(current_user);
+			break;
+		default:
+			printf("Syntax Error! Please choose again!\n");
+	}
+}
+
 // communicate from client to server
 // send and recv message with server
-void communicateWithServer(){
-	char current_user[255];
-	while(1){
-		if(!isOnline){
-			printf("Choose 0 to login - 1 to register!\n");
-			scanf("%c", &choose);
-			while(getchar() != '\n');
-			switch (choose){
-				case '0':
-					loginFunc(current_user);
-					break;
-				case '1':
-					registerFunc(current_user);
-					break;
-				default:
-					printf("Syntax Error! Please choose again!\n");
-			}
-		}
-		else{
-			printf("Choose 1 to search file - 0 to logout?\n");
-			scanf("%c", &choose);
-			while(getchar() != '\n');
-			switch (choose){
-				case '0':
-					logoutFunc(current_user);
-					isOnline = 0;
-					//UnderMethodClose();
-					break;
-				case '1':
-					// searchFileFunc();
-					printf("search file func!\n");
-					break;
-				default:
-					printf("Syntax Error! Please choose again!\n");
-			}
+void communicateWithUser(){
+	while(1) {
+		if(!isOnline) {
+			authenticateFunc();
+		} else {
+			requestFileFunc();
 		}
 	}
+}
+
+void handle() {
+
 }
 
 /*
@@ -222,7 +311,7 @@ int main(int argc, char const *argv[])
 	connectToServer(SOCK);
 
 	//Step 4: Communicate with server			
-	communicateWithServer();
+	communicateWithUser();
 
 	close(client_sock);
 	return 0;

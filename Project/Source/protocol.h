@@ -33,7 +33,8 @@ typedef enum {
 	TYPE_REQUEST_FILE,
 	TYPE_REQUEST_DOWNLOAD,
 	TYPE_UPLOAD_FILE,
-	TYPE_ERROR
+	TYPE_ERROR,
+	TYPE_BACKGROUND
 } MessageType;
 
 typedef struct Message{
@@ -43,6 +44,11 @@ typedef struct Message{
 	char payload[PAYLOAD_SIZE];
 } Message;
 
+typedef struct Client {
+	int requestId;
+	char username[30];
+	int connSock;
+} Client;
 /*
 * clone Message mess from temp
 * @param Message* mess, Message temp

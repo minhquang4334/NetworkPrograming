@@ -25,6 +25,14 @@
 #define PRIVATE_KEY 256
 int requestId = 1;
 
+Client onlineClient[1000];
+
+void initArrayClient() {
+	int i;
+	for(i = 0; i < 1000; i++) {
+		onlineClient[i].requestId = 0;
+	}
+}
 // count number param of command
 int numberElementsInArray(char** temp) {
 	int i;
@@ -33,6 +41,45 @@ int numberElementsInArray(char** temp) {
         // count number elements in array
     }
     return i;
+}
+void printListOnlineClient() {
+	int i;
+	for (i = 0; i < 1000; i++) {
+		if(onlineClient[i].requestId > 0) {
+			printf("\n---ConnSock---: %d", onlineClient[i].connSock);
+			printf("\n---RequestId---: %d", onlineClient[i].requestId);
+			printf("\n---Username---: %s", onlineClient[i].username);
+		}
+	}
+}
+
+int findAvaiableElementInArrayClient() {
+	int i;
+	for (i = 0; i < 1000; i++) {
+		if(onlineClient[i].requestId == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+int findClient(int requestId) {
+	int i;
+	for (i = 0; i < 1000; i++) {
+		if(onlineClient[i].requestId == requestId) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void setClient(int i, int requestId, char* username) {
+	if(i >= 0) {
+		onlineClient[i].requestId = requestId;
+		strcpy(onlineClient[i].username, username);
+	} else {
+		printf("Full Client, Service not avaiable!!\n");
+	}
 }
 
 void handleLogin(Message mess, int connSock) {
@@ -55,6 +102,8 @@ void handleLogin(Message mess, int connSock) {
 					else{
 						if(mess.requestId == 0) {
 							mess.requestId = requestId++;
+							int i = findAvaiableElementInArrayClient();
+							setClient(i, mess.requestId, username);
 						}
 					}
 				} else {
@@ -94,11 +143,13 @@ void handleRegister(Message mess, int connSock){
 				strcpy(password, passStr[1]);
 				if(validateUsername(username) || validatePassword(password)) {
 					registerCode = registerUser(username, password);
-					if(registerCode!=REGISTER_SUCCESS)
+					if(registerCode != REGISTER_SUCCESS)
 						mess.type=TYPE_ERROR;
-					else{
+					else {
 						if(mess.requestId == 0) {
 							mess.requestId = requestId++;
+							int i = findAvaiableElementInArrayClient();
+							setClient(i, mess.requestId, username);
 						}
 					}
 				} else {
@@ -156,6 +207,14 @@ void handleAuthenticateRequest(Message mess, int connSock) {
 void handleRequestFile(Message recvMess, int connSock) {
 
 }
+
+void addClientSocket(int id, int connSock) {
+	int i = findClient(id);
+	if(i >= 0) {
+		onlineClient[i].connSock = connSock;
+	}
+}
+
 /*
 * Handler Request from Client
 * @param char* message, int key
@@ -165,7 +224,6 @@ void* client_handler(void* conn_sock) {
 	int connSock;
 	connSock = *((int *) conn_sock);
 	Message recvMess;
-	
 	pthread_detach(pthread_self());
 	while(1) {
 		//receives message from client
@@ -177,6 +235,11 @@ void* client_handler(void* conn_sock) {
 			case TYPE_AUTHENTICATE: 
 				handleAuthenticateRequest(recvMess, connSock);
 				break;
+			case TYPE_BACKGROUND: 
+				addClientSocket(recvMess.requestId, connSock);
+				//printListOnlineClient();
+				break;
+
 			case TYPE_REQUEST_FILE: 
 				// handleRequestFile(recvMess, connSock);
 				break;
@@ -225,7 +288,7 @@ int main(int argc, char **argv)
 	server.sin_family = AF_INET;         
 	server.sin_port = htons(port_number);   /* Remember htons() from "Conversions" section? =) */
 	server.sin_addr.s_addr = htonl(INADDR_ANY);  /* INADDR_ANY puts your IP address automatically */   
-	if(bind(listen_sock, (struct sockaddr*)&server, sizeof(server))==-1){ /* calls bind() */
+	if(bind(listen_sock, (struct sockaddr*)&server, sizeof(server)) == -1){ /* calls bind() */
 		perror("\nError: ");
 		return 0;
 	}     
@@ -235,7 +298,7 @@ int main(int argc, char **argv)
 		perror("\nError: ");
 		return 0;
 	}
-	
+	initArrayClient();
 	readFile();
 	printList();
 	//Step 4: Communicate with client
