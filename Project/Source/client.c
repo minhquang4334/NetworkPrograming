@@ -50,6 +50,15 @@ int initSock(){
 	return newsock;
 }
 
+void *showBubbleNotify(void *notify){	
+	char command[200];
+
+	sprintf(command, "terminal-notifier -message \"%s\"", notify);
+	system(command);
+	sprintf(command, "say \"%s\"", notify);
+	system(command);
+	return NULL;
+}
 
 // bind socket of client 
 void bindClient(int port, char *serverAddr){
@@ -233,6 +242,9 @@ void loginFunc(char *current_user){
 		strcpy(current_user, username);
 		backgroundHandleStart();
 		findOrCreateFolderUsername(username);
+		showBubbleNotify("Login Successfully!!");
+	} else {
+		showBubbleNotify("[Error] Login Failed!!");
 	}
 	printf("%s\n", mess->payload);
 }
@@ -270,6 +282,9 @@ void registerFunc(char *current_user){
 			strcpy(current_user, username);
 			backgroundHandleStart();
 			findOrCreateFolderUsername(username);
+			showBubbleNotify("Register Successfully!!");
+		} else {
+			showBubbleNotify("[Error] Register Failed!!");
 		}
 		printf("%s\n", mess->payload);
 	}
@@ -417,6 +432,9 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	printf("......................Donwloading..........\n");
 	char path[100];
 	download(fileName, path);
+	char message[100];
+	sprintf(message, "...Donwload Success.. File save in %s\n", path);
+	showBubbleNotify(message);
 	printf("...Donwload Success.. File save in %s\n", path);
 }
 
