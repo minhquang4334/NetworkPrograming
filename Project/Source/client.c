@@ -328,7 +328,11 @@ void showListFile() {
 	}
 }
 
-void showListSelectUser(char* listUser, char* username) {
+int showListSelectUser(char* listUser, char* username) {
+	if(strlen(listUser) == 0) {
+		printf("\n--This File Not Found In System!!\n");
+		return -1;
+	}
 	char** list = str_split(listUser, ',');
 	int i;
 	printf("\n---------- List User ------------\n");
@@ -357,6 +361,7 @@ void showListSelectUser(char* listUser, char* username) {
 	else {
 		strcpy(username, list[option - 1]);
 	}
+	return 1;
 }
 
 void download(char* fileName) {
@@ -420,8 +425,10 @@ void handleSearchFile() {
 	sendMessage(client_sock, *mess);
 	printWatingMsg();
 	receiveMessage(client_sock, mess);
-	showListSelectUser(mess->payload, selectedUser);
-	handleDownloadFile(selectedUser, fileName);
+	if(showListSelectUser(mess->payload, selectedUser) == 1) {
+		handleDownloadFile(selectedUser, fileName);
+	}	
+	
 }
 
 void requestFileFunc() {
