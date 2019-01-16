@@ -392,7 +392,7 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	sprintf(msg.payload, "%s\n%s", selectedUser, fileName);
 	msg.length = strlen(msg.payload);
 	sendMessage(client_sock, msg);
-	printWatingMsg();
+	printf("......................Donwloading..........\n");
 	download(client_sock, fileName);
 	printf("......................Donwload Success...........\n");
 }
@@ -420,8 +420,7 @@ void handleSearchFile() {
 	sendMessage(client_sock, *mess);
 	printWatingMsg();
 	receiveMessage(client_sock, mess);
-	printMess(*mess);
-	printf("\n.......................downloading......\n");
+	showListSelectUser(mess->payload, selectedUser);
 	handleDownloadFile(selectedUser, fileName);
 }
 
