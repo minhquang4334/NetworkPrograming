@@ -24,6 +24,8 @@ void messageCode(StatusCode code, char *msg) {
         break;
         case LOGOUT_SUCCESS: strcpy(msg, "Logout SuccessFully!!");
         break;
+        case FILE_NOT_FOUND: strcpy(msg, "User Not Found!!");
+        break;
         case COMMAND_INVALID: strcpy(msg, "Command was invalid!!");
         break;
         case USERNAME_OR_PASSWORD_INVALID: strcpy(msg, "Username or Password invalid!!");

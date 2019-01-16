@@ -46,9 +46,9 @@ void printListOnlineClient() {
 	int i;
 	for (i = 0; i < 1000; i++) {
 		if(onlineClient[i].requestId > 0) {
-			printf("\n---ConnSock---: %d", onlineClient[i].connSock);
-			printf("\n---RequestId---: %d", onlineClient[i].requestId);
-			printf("\n---Username---: %s", onlineClient[i].username);
+			printf("\n---ConnSock---: %d\n", onlineClient[i].connSock);
+			printf("---RequestId---: %d\n", onlineClient[i].requestId);
+			printf("---Username---: %s\n", onlineClient[i].username);
 		}
 	}
 }
@@ -67,6 +67,16 @@ int findClient(int requestId) {
 	int i;
 	for (i = 0; i < 1000; i++) {
 		if(onlineClient[i].requestId == requestId) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+int findClientByUsername(char* username) {
+	int i;
+	for (i = 0; i < 1000; i++) {
+		if(!strcmp(onlineClient[i].username, username) && (onlineClient[i].requestId > 0)) {
 			return i;
 		}
 	}
@@ -204,8 +214,44 @@ void handleAuthenticateRequest(Message mess, int connSock) {
 	}
 }
 
-void handleRequestFile(Message recvMess, int connSock) {
+char* searchFileInOnlineClients(char* fileName, int requestId, char* listUser) {
+	int i;
+	Message msg, recvMsg;
+	msg.requestId = requestId;
+	
+	strcpy(msg.payload, fileName);
+	msg.length = strlen(msg.payload);
+	msg.type = TYPE_REQUEST_FILE;
+	for(i = 0; i < 1000; i++) {
+		if((onlineClient[i].requestId > 0) && (onlineClient[i].requestId != requestId)) {
+			sendMessage(onlineClient[i].connSock, msg);
+			receiveMessage(onlineClient[i].connSock, &recvMsg);
+			if(recvMsg.type != TYPE_ERROR) {
+				strcat(listUser, onlineClient[i].username);
+				strcat(listUser, ",");
+			}
+		}
+	}
+	if(strlen(listUser) > 0) {
+		listUser[strlen(listUser) - 1] = '\0';
+	}
+	return listUser;
+}
 
+void handleRequestFile(Message recvMess, int connSock) {
+	printMess(recvMess);
+	char fileName[100];
+	char listUser[2000] = "";
+	strcpy(fileName, recvMess.payload);
+	int requestId = recvMess.requestId;
+	searchFileInOnlineClients(fileName, requestId, listUser);
+	printf("List: %s\n", listUser);
+	Message msg;
+	msg.requestId = recvMess.requestId;
+	msg.type = TYPE_REQUEST_FILE;
+	strcpy(msg.payload, listUser);
+	msg.length = strlen(msg.payload);
+	sendMessage(connSock, msg);
 }
 
 void addClientSocket(int id, int connSock) {
@@ -213,6 +259,90 @@ void addClientSocket(int id, int connSock) {
 	if(i >= 0) {
 		onlineClient[i].connSock = connSock;
 	}
+}
+
+void removeFile(char* fileName) {
+	// remove file
+    if (remove(fileName) == 0)
+        printf("Handle Success!!! %s file deleted successfully.\n", fileName);
+    else
+    {
+        printf("Unable to delete the file\n");
+        perror("Following error occurred\n");
+    }
+}
+
+
+int sendRequestDownload(char* selectedUser, char* fileName, int connSock) {
+	int i = findClientByUsername(selectedUser);
+	char tmpFileName[100];
+	FILE *tmpFile;
+	Message msg, recvMsg, sendMess;
+	fflush(stdout);
+	if(i >= 0) {
+		//printf("kkkkkk\n");
+		msg.type = TYPE_REQUEST_DOWNLOAD;
+		strcpy(msg.payload, fileName);
+		msg.length = strlen(msg.payload);
+		msg.requestId = onlineClient[i].requestId;
+		sendMessage(onlineClient[i].connSock, msg);
+		sprintf(tmpFileName, "%lu", (unsigned long)time(NULL));
+		if((tmpFile = fopen(tmpFileName, "wb+")) == NULL) {
+			perror("You have not create file permission!!\n");
+			return -1;
+		}
+		while(1) {
+			//printf("hehehehe\n");
+			if(receiveMessage(onlineClient[i].connSock, &recvMsg) < 0) {
+				printf("ko nhan dc gi ca\n");
+				break;
+			}
+			if(recvMsg.length > 0) {
+				fwrite(recvMsg.payload, 1, recvMsg.length, tmpFile);
+			}
+			else if(recvMsg.length == 0) {
+				fseek(tmpFile, 0, SEEK_SET);
+				break;
+			}
+		}
+		while(!feof(tmpFile)) {
+			fflush(stdout);
+			//printf("11111111");
+            char buffer[PAYLOAD_SIZE];
+           	int bytes_send = fread(buffer, 1, PAYLOAD_SIZE, tmpFile);
+           	if(bytes_send <= 0) {
+           		break;
+           	}
+            sendMess.length = bytes_send;
+            sendMess.requestId = onlineClient[i].requestId;
+            memcpy(sendMess.payload, buffer, bytes_send);
+            sendMessage(connSock, sendMess);
+        }
+
+        sendMess.length = 0;
+        sendMessage(connSock, sendMess);
+        fclose(tmpFile);
+        removeFile(tmpFileName);
+	} else {
+		msg.type = TYPE_ERROR;
+		return TYPE_ERROR;
+	}
+	return 1;
+}
+void handleRequestDownload(Message recvMess, int connSock) {
+	char** temp = str_split(recvMess.payload, '\n');
+	char selectedUser[30];
+	char fileName[30];
+	printMess(recvMess);
+	MessageType type = TYPE_ERROR;
+	if(numberElementsInArray(temp) == 2) {
+		strcpy(selectedUser, temp[0]);
+		strcpy(fileName, temp[1]);
+		type = sendRequestDownload(selectedUser, fileName, connSock);
+	} else {
+		type = TYPE_ERROR;
+	}
+
 }
 
 /*
@@ -237,13 +367,14 @@ void* client_handler(void* conn_sock) {
 				break;
 			case TYPE_BACKGROUND: 
 				addClientSocket(recvMess.requestId, connSock);
-				//printListOnlineClient();
-				break;
+				printListOnlineClient();
+				return NULL;
 
 			case TYPE_REQUEST_FILE: 
-				// handleRequestFile(recvMess, connSock);
+				handleRequestFile(recvMess, connSock);
 				break;
 			case TYPE_REQUEST_DOWNLOAD: 
+				handleRequestDownload(recvMess, connSock);
 				break;
 			case TYPE_UPLOAD_FILE: 
 				break;

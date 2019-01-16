@@ -49,6 +49,11 @@ typedef struct Client {
 	char username[30];
 	int connSock;
 } Client;
+
+typedef struct FileStruct {
+	Client client;
+	char fileName[100];
+} FileStruct;
 /*
 * clone Message mess from temp
 * @param Message* mess, Message temp
