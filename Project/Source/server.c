@@ -226,7 +226,7 @@ char* searchFileInOnlineClients(char* fileName, int requestId, char* listUser) {
 	int i;
 	Message msg, recvMsg;
 	msg.requestId = requestId;
-	
+	char user[200];
 	strcpy(msg.payload, fileName);
 	msg.length = strlen(msg.payload);
 	msg.type = TYPE_REQUEST_FILE;
@@ -235,8 +235,9 @@ char* searchFileInOnlineClients(char* fileName, int requestId, char* listUser) {
 			sendMessage(onlineClient[i].connSock, msg);
 			receiveMessage(onlineClient[i].connSock, &recvMsg);
 			if(recvMsg.type != TYPE_ERROR) {
-				strcat(listUser, onlineClient[i].username);
-				strcat(listUser, ",");
+				sprintf(user, "%s %s", onlineClient[i].username, recvMsg.payload);
+				strcat(listUser, user);
+				strcat(listUser, "\n");
 			}
 		}
 	}

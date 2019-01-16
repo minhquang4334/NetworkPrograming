@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 
 #include "protocol.h"
@@ -27,6 +28,7 @@ char choose;
 Message *mess;
 int isOnline = 0;
 char fileRepository[100];
+#define DIM(x) (sizeof(x)/sizeof(*(x)))
 
 // count number param of command
 int numberElementsInArray(char** temp) {
@@ -79,9 +81,18 @@ void handleRequestFile(Message recvMess) {
 	getFullPath(fileName, fullPath);
 	FILE *fptr;
 	fptr = fopen(fullPath, "r");
+
 	if(fptr != NULL) {
 		msg.type = TYPE_REQUEST_FILE;
-		
+		long filelen;
+	    fseek(fptr, 0, SEEK_END);          // Jump to the end of the file
+	    filelen = ftell(fptr);             // Get the current byte offset in the file       
+	    rewind(fptr);
+	    char len[100];
+	    sprintf(len, "%ld", filelen);
+	    strcpy(msg.payload, len);
+	    msg.length = strlen(msg.payload);
+	    fclose(fptr);
 	} else {
 		msg.type = TYPE_ERROR;
 	}
@@ -183,7 +194,7 @@ void connectToServer(SocketType type){
 }
 
 // start method run on background to wait search and download file request
-void backgroundHandleStart(){
+void backgroundHandleStart() {
 	under_client_sock = initSock();
 	connectToServer(UNDER_SOCK);
 }
@@ -290,7 +301,8 @@ void mainMenu() {
 	printf("\n---------------FileShareSystem-------------\n");
 	printf("\n1 - Search File In Shared System");
 	printf("\n2 - View Your List Files");
-	printf("\n3 - Logout");
+	printf("\n3 - User Manual");
+	printf("\n4 - Logout");
 	printf("\nPlease choose: ");
 }
 
@@ -328,17 +340,19 @@ void showListFile() {
 	}
 }
 
-int showListSelectUser(char* listUser, char* username) {
+int showListSelectUser(char* listUser, char* username, char* fileName) {
 	if(strlen(listUser) == 0) {
 		printf("\n--This File Not Found In System!!\n");
 		return -1;
 	}
-	char** list = str_split(listUser, ',');
+	char** list = str_split(listUser, '\n');
 	int i;
 	printf("\n---------- List User ------------\n");
+	printf(" Username\t\t\tFile\t\t\tSize\n");
 	for (i = 0; *(list + i); i++)
     {
-        printf("\n%d. %s", i + 1, *(list + i));
+    	char** tmp = str_split(*(list + i), ' ');
+        printf("\n%d. %s\t\t\t%s\t\t\t%s", i + 1, tmp[0], fileName, tmp[1]);
     }
 
     char choose[10];
@@ -356,15 +370,16 @@ int showListSelectUser(char* listUser, char* username) {
 	}
 	
 	if(option == 0) {
-		//return NULL;
+		return -1;
 	}
 	else {
-		strcpy(username, list[option - 1]);
+		char** tmp = str_split(list[option - 1], ' ');
+		strcpy(username, tmp[0]);
 	}
 	return 1;
 }
 
-void download(char* fileName) {
+void download(char* fileName, char* path) {
 	Message recvMsg;
 	FILE *fptr;
 	char tmpFileName[100];
@@ -377,6 +392,7 @@ void download(char* fileName) {
 	}
 	
 	getFullPath(tmpFileName, fullPath);
+	strcpy(path, fullPath);
 	fptr = fopen(fullPath, "w+");
 	while(1) {
         receiveMessage(client_sock, &recvMsg);
@@ -388,6 +404,7 @@ void download(char* fileName) {
         }
     }
     fclose(fptr);
+    
 }
 
 void handleDownloadFile(char* selectedUser,char* fileName) {
@@ -398,37 +415,58 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	msg.length = strlen(msg.payload);
 	sendMessage(client_sock, msg);
 	printf("......................Donwloading..........\n");
-	download(fileName);
-	printf("......................Donwload Success...........\n");
+	char path[100];
+	download(fileName, path);
+	printf("...Donwload Success.. File save in %s\n", path);
 }
 
 void handleSearchFile() {
 	char fileName[100];
 	char selectedUser[30];
-	//char choose[20];
-	//int isSearchFile = 1;
+	char choose = '\0';
 	printf("Please Input File Name You Want To Search: ");
 	scanf("%[^\n]s", fileName);
+	char fullPath[100];
+	getFullPath(fileName, fullPath);
 	while(getchar() != '\n');
-	// FILE *fptr;
-	// fptr = fopen(fileName, "r");
-	// if(fptr != NULL) {
-	// 	printf("\nYou have a file with same name!\n -- Are you want to continue search? y/n: ");
-	// 	while(1) {
-	// 		scanf("%s", &choose);
-	// 		while(getchar() != '\n');
-	// 	}
-	// }
+	FILE *fptr;
+	fptr = fopen(fullPath, "r");
+	if(fptr != NULL) {
+		while(1) {
+			printf("\nYou have a file with same name!\n -- Are you want to continue search? y/n: ");
+			scanf("%c", &choose);
+			while(getchar() != '\n');
+			if((choose == 'y' || (choose == 'n'))) {
+				break;
+			}
+		}
+	}
+	if(choose == 'n') {
+		return;
+	}
 	mess->type = TYPE_REQUEST_FILE;
 	strcpy(mess->payload, fileName);
 	mess->length = strlen(mess->payload);
 	sendMessage(client_sock, *mess);
 	printWatingMsg();
 	receiveMessage(client_sock, mess);
-	if(showListSelectUser(mess->payload, selectedUser) == 1) {
+	if(showListSelectUser(mess->payload, selectedUser, fileName) == 1) {
 		handleDownloadFile(selectedUser, fileName);
 	}	
+}
+
+void manual() {
+	printf("\n---- For search and download file from system press 1 and type file name\n");
+	printf("---- For view list file in your folder press 2\n");
 	
+	char choose;	
+	while(1) {
+		printf("Press Q/q for back to main menu: ");
+		scanf("%c", &choose);
+		while(getchar() != '\n');
+		if((choose == 'q') || (choose == 'Q')) break;
+	}
+	return;
 }
 
 void requestFileFunc() {
@@ -444,6 +482,9 @@ void requestFileFunc() {
 			showListFile();
 			break;
 		case '3':
+			manual();
+			break;
+		case '4':
 			logoutFunc(current_user);
 			break;
 		default:
@@ -501,7 +542,6 @@ int main(int argc, char const *argv[])
 
 	//Step 1: Construct socket
 	client_sock = initSock();
-	printf("client_sock: %d\n", client_sock);
 	//Step 2: Specify server address
 	bindClient(port, serAddr);
 	
