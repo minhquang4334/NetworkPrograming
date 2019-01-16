@@ -50,10 +50,11 @@ typedef struct Client {
 	int connSock;
 } Client;
 
-typedef struct FileStruct {
-	Client client;
-	char fileName[100];
-} FileStruct;
+typedef struct FileMatching {
+	int requestId;
+	FILE* fptr;
+	int isDownloadSuccess;
+} FileMatching;
 /*
 * clone Message mess from temp
 * @param Message* mess, Message temp

@@ -23,6 +23,7 @@
 
 #define BUFF_SEND 1024
 #define PRIVATE_KEY 256
+pthread_mutex_t lock;
 int requestId = 1;
 
 Client onlineClient[1000];
@@ -189,12 +190,19 @@ void handleLogout(Message mess, int connSock){
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode logoutCode;
 	if(numberElementsInArray(temp) != 2) {
-		mess.type=TYPE_ERROR;
+		mess.type = TYPE_ERROR;
 		logoutCode = COMMAND_INVALID;
 		printf("Fails on handle logout!!");
 	}
 	else{
 		logoutCode = logoutUser(temp[1]);
+		if(logoutCode == LOGOUT_SUCCESS) {
+			int i = findClient(mess.requestId);
+			if(i >= 0) {
+				onlineClient[i].requestId = 0;
+				onlineClient[i].username[0] = '\0';
+			}
+		}
 	}
 	sendWithCode(mess, logoutCode, connSock);
 }
@@ -239,13 +247,13 @@ char* searchFileInOnlineClients(char* fileName, int requestId, char* listUser) {
 }
 
 void handleRequestFile(Message recvMess, int connSock) {
-	printMess(recvMess);
+	//printMess(recvMess);
 	char fileName[100];
 	char listUser[2000] = "";
 	strcpy(fileName, recvMess.payload);
 	int requestId = recvMess.requestId;
 	searchFileInOnlineClients(fileName, requestId, listUser);
-	printf("List: %s\n", listUser);
+	//printf("List: %s\n", listUser);
 	Message msg;
 	msg.requestId = recvMess.requestId;
 	msg.type = TYPE_REQUEST_FILE;
@@ -273,7 +281,7 @@ void removeFile(char* fileName) {
 }
 
 
-int sendRequestDownload(char* selectedUser, char* fileName, int connSock) {
+int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int connSock) {
 	int i = findClientByUsername(selectedUser);
 	char tmpFileName[100];
 	FILE *tmpFile;
@@ -291,6 +299,7 @@ int sendRequestDownload(char* selectedUser, char* fileName, int connSock) {
 			perror("You have not create file permission!!\n");
 			return -1;
 		}
+		pthread_mutex_lock(&lock);
 		while(1) {
 			//printf("hehehehe\n");
 			if(receiveMessage(onlineClient[i].connSock, &recvMsg) < 0) {
@@ -305,6 +314,7 @@ int sendRequestDownload(char* selectedUser, char* fileName, int connSock) {
 				break;
 			}
 		}
+		pthread_mutex_unlock(&lock);
 		while(!feof(tmpFile)) {
 			fflush(stdout);
 			//printf("11111111");
@@ -322,7 +332,7 @@ int sendRequestDownload(char* selectedUser, char* fileName, int connSock) {
         sendMess.length = 0;
         sendMessage(connSock, sendMess);
         fclose(tmpFile);
-        removeFile(tmpFileName);
+       	removeFile(tmpFileName);
 	} else {
 		msg.type = TYPE_ERROR;
 		return TYPE_ERROR;
@@ -333,12 +343,12 @@ void handleRequestDownload(Message recvMess, int connSock) {
 	char** temp = str_split(recvMess.payload, '\n');
 	char selectedUser[30];
 	char fileName[30];
-	printMess(recvMess);
+	//printMess(recvMess);
 	MessageType type = TYPE_ERROR;
 	if(numberElementsInArray(temp) == 2) {
 		strcpy(selectedUser, temp[0]);
 		strcpy(fileName, temp[1]);
-		type = sendRequestDownload(selectedUser, fileName, connSock);
+		type = sendRequestDownload(recvMess.requestId, selectedUser, fileName, connSock);
 	} else {
 		type = TYPE_ERROR;
 	}
@@ -367,7 +377,7 @@ void* client_handler(void* conn_sock) {
 				break;
 			case TYPE_BACKGROUND: 
 				addClientSocket(recvMess.requestId, connSock);
-				printListOnlineClient();
+				//printListOnlineClient();
 				return NULL;
 
 			case TYPE_REQUEST_FILE: 
@@ -440,7 +450,11 @@ int main(int argc, char **argv)
 			perror("\nError: ");
   
 		printf("You got a connection from %s\n", inet_ntoa(client.sin_addr) ); /* prints client's IP */
-		
+		if (pthread_mutex_init(&lock, NULL) != 0) 
+	    { 
+	        printf("\n mutex init has failed\n"); 
+	        return 1; 
+	    } 
 		//start conversation
 		pthread_create(&tid, NULL, &client_handler, &conn_sock);	
 	}

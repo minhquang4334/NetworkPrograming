@@ -85,7 +85,7 @@ int login(char* username, char* password){
 	User *user = searchUser(username);
 	if(user == NULL) return USER_NOT_FOUND;
 	else{
-		if(isOnline(username)) return USER_IS_ONLINE;
+		if(user->isLogin == ONLINE) return USER_IS_ONLINE;
 		else if(user->status == ACTIVE){
 			if(!identifyPassWord(user, password)){
 				user->isLogin = ONLINE;
@@ -163,13 +163,12 @@ int registerUser(char* username, char* password){
 }
 
 int logoutUser(char *username){
-	User *ptr=head;
-	while(ptr!=NULL){
-		if(!strcmp(ptr->username,username)){
-			ptr->isLogin=OFFLINE;
-			return LOGOUT_SUCCESS;
-		}
-		ptr = ptr->next;
+	User *user = searchUser(username);
+	if(user->isLogin == ONLINE) {
+		user->isLogin = OFFLINE;
+		return LOGOUT_SUCCESS;
+	} else {
+		return COMMAND_INVALID;
 	}
 	return SERVER_ERROR;
 }

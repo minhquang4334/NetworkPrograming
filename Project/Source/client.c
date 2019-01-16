@@ -116,7 +116,7 @@ void uploadFile(Message recvMess) {
             char* buffer = (char *) malloc((numberByteSend) * sizeof(char));
             fread(buffer, numberByteSend, 1, fptr); // read buffer with size 
             memcpy(sendMsg.payload, buffer, numberByteSend);
-            sendMsg.length = (short) numberByteSend;
+            sendMsg.length = numberByteSend;
             sumByte += numberByteSend; //increase byte send
             //printf("sumByte: %d\n", sumByte);
             if(sendMessage(under_client_sock, sendMsg) <= 0) {
@@ -359,7 +359,7 @@ void showListSelectUser(char* listUser, char* username) {
 	}
 }
 
-void download(int client_sock, char* fileName) {
+void download(char* fileName) {
 	Message recvMsg;
 	FILE *fptr;
 	char tmpFileName[100];
@@ -393,7 +393,7 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	msg.length = strlen(msg.payload);
 	sendMessage(client_sock, msg);
 	printf("......................Donwloading..........\n");
-	download(client_sock, fileName);
+	download(fileName);
 	printf("......................Donwload Success...........\n");
 }
 
@@ -494,6 +494,7 @@ int main(int argc, char const *argv[])
 
 	//Step 1: Construct socket
 	client_sock = initSock();
+	printf("client_sock: %d\n", client_sock);
 	//Step 2: Specify server address
 	bindClient(port, serAddr);
 	
