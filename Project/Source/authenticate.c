@@ -94,8 +94,11 @@ int login(char* username, char* password){
 			}
 			else{
 				user->countFails ++;
-				if(user->countFails == MAX_LOGIN_FAILS)
+				if(user->countFails == MAX_LOGIN_FAILS){
+					user->status = BLOCK;
+					updateFile();
 					return BLOCKED_USER;
+				}
 				return PASSWORD_INVALID;
 			}
 		}
