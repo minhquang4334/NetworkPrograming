@@ -52,10 +52,7 @@ int initSock(){
 
 void *showBubbleNotify(void *notify){	
 	char command[200];
-
 	sprintf(command, "terminal-notifier -message \"%s\"", notify);
-	system(command);
-	sprintf(command, "say \"%s\"", notify);
 	system(command);
 	return NULL;
 }
@@ -117,9 +114,12 @@ void uploadFile(Message recvMess) {
 	sendMsg.requestId = recvMess.requestId;
 	FILE* fptr;
 	if ((fptr = fopen(fullPath, "rb+")) == NULL){
-        printf("Error: File not found\n");
+        //printf("Error: File not found\n");
         fclose(fptr);
         msg.type = TYPE_ERROR;
+        msg.requestId = recvMess.requestId;
+        msg.length = 0;
+        sendMessage(under_client_sock, msg);
     }
     else {
     	long filelen;
@@ -242,9 +242,8 @@ void loginFunc(char *current_user){
 		strcpy(current_user, username);
 		backgroundHandleStart();
 		findOrCreateFolderUsername(username);
-		showBubbleNotify("Login Successfully!!");
 	} else {
-		showBubbleNotify("[Error] Login Failed!!");
+		showBubbleNotify("Error: Login Failed!!");
 	}
 	printf("%s\n", mess->payload);
 }
@@ -282,9 +281,8 @@ void registerFunc(char *current_user){
 			strcpy(current_user, username);
 			backgroundHandleStart();
 			findOrCreateFolderUsername(username);
-			showBubbleNotify("Register Successfully!!");
 		} else {
-			showBubbleNotify("[Error] Register Failed!!");
+			showBubbleNotify("Error: Register Failed!!");
 		}
 		printf("%s\n", mess->payload);
 	}
@@ -354,6 +352,13 @@ void showListFile() {
 	  perror ("Permission denied!!");
 	}
 }
+void removeFile(char* fileName) {
+	// remove file
+    if (remove(fileName) != 0)
+    {
+        perror("Following error occurred\n");
+    }
+}
 
 int showListSelectUser(char* listUser, char* username, char* fileName) {
 	if(strlen(listUser) == 0) {
@@ -394,7 +399,7 @@ int showListSelectUser(char* listUser, char* username, char* fileName) {
 	return 1;
 }
 
-void download(char* fileName, char* path) {
+int download(char* fileName, char* path) {
 	Message recvMsg;
 	FILE *fptr;
 	char tmpFileName[100];
@@ -411,6 +416,11 @@ void download(char* fileName, char* path) {
 	fptr = fopen(fullPath, "w+");
 	while(1) {
         receiveMessage(client_sock, &recvMsg);
+        if(recvMsg.type == TYPE_ERROR) {
+        	fclose(fptr);
+        	removeFile(fullPath);
+        	return -1;
+        }
         //printMess(recvMsg);
         if(recvMsg.length > 0) { 
             fwrite(recvMsg.payload, recvMsg.length, 1, fptr);
@@ -419,8 +429,10 @@ void download(char* fileName, char* path) {
         }
     }
     fclose(fptr);
-    
+    return 1;
 }
+
+
 
 void handleDownloadFile(char* selectedUser,char* fileName) {
 	Message msg;
@@ -431,7 +443,11 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	sendMessage(client_sock, msg);
 	printf("......................Donwloading..........\n");
 	char path[100];
-	download(fileName, path);
+	if(download(fileName, path) == -1) {
+		showBubbleNotify("Error: Something Error When Downloading File!!");
+		printf("Error: Something Error When Downloading File!!\n");
+		return;
+	}
 	char message[100];
 	sprintf(message, "...Donwload Success.. File save in %s\n", path);
 	showBubbleNotify(message);

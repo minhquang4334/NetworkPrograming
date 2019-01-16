@@ -289,7 +289,6 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
 	Message msg, recvMsg, sendMess;
 	fflush(stdout);
 	if(i >= 0) {
-		//printf("kkkkkk\n");
 		msg.type = TYPE_REQUEST_DOWNLOAD;
 		strcpy(msg.payload, fileName);
 		msg.length = strlen(msg.payload);
@@ -297,14 +296,18 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
 		sendMessage(onlineClient[i].connSock, msg);
 		sprintf(tmpFileName, "%lu", (unsigned long)time(NULL));
 		if((tmpFile = fopen(tmpFileName, "wb+")) == NULL) {
+			msg.type = TYPE_ERROR;
+			sendMessage(connSock, msg);
 			perror("You have not create file permission!!\n");
 			return -1;
 		}
 		pthread_mutex_lock(&lock);
 		while(1) {
-			//printf("hehehehe\n");
 			if(receiveMessage(onlineClient[i].connSock, &recvMsg) < 0) {
-				printf("ko nhan dc gi ca\n");
+				break;
+			}
+			if(recvMsg.type == TYPE_ERROR) {
+				sendMessage(connSock, recvMsg);
 				break;
 			}
 			if(recvMsg.length > 0) {
@@ -316,6 +319,11 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
 			}
 		}
 		pthread_mutex_unlock(&lock);
+		if(recvMsg.type == TYPE_ERROR) {
+			fclose(tmpFile);
+       		removeFile(tmpFileName);
+			return -1;
+		}
 		while(!feof(tmpFile)) {
 			fflush(stdout);
 			//printf("11111111");
@@ -325,7 +333,7 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
            		break;
            	}
             sendMess.length = bytes_send;
-            sendMess.requestId = onlineClient[i].requestId;
+            sendMess.requestId = requestId;
             memcpy(sendMess.payload, buffer, bytes_send);
             sendMessage(connSock, sendMess);
         }
@@ -336,7 +344,8 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
        	removeFile(tmpFileName);
 	} else {
 		msg.type = TYPE_ERROR;
-		return TYPE_ERROR;
+		sendMessage(connSock, msg);
+		return 1;
 	}
 	return 1;
 }
@@ -349,7 +358,7 @@ void handleRequestDownload(Message recvMess, int connSock) {
 	if(numberElementsInArray(temp) == 2) {
 		strcpy(selectedUser, temp[0]);
 		strcpy(fileName, temp[1]);
-		type = sendRequestDownload(recvMess.requestId, selectedUser, fileName, connSock);
+		sendRequestDownload(recvMess.requestId, selectedUser, fileName, connSock);
 	} else {
 		type = TYPE_ERROR;
 	}
