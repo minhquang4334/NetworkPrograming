@@ -112,9 +112,11 @@ void handleLogin(Message mess, int connSock) {
 						mess.type = TYPE_ERROR;
 					else{
 						if(mess.requestId == 0) {
+							pthread_mutex_lock(&lock);
 							mess.requestId = requestId++;
 							int i = findAvaiableElementInArrayClient();
 							setClient(i, mess.requestId, username);
+							pthread_mutex_unlock(&lock);
 						}
 					}
 				} else {
@@ -158,9 +160,11 @@ void handleRegister(Message mess, int connSock){
 						mess.type=TYPE_ERROR;
 					else {
 						if(mess.requestId == 0) {
+							pthread_mutex_lock(&lock);
 							mess.requestId = requestId++;
 							int i = findAvaiableElementInArrayClient();
 							setClient(i, mess.requestId, username);
+							pthread_mutex_unlock(&lock);
 						}
 					}
 				} else {
@@ -265,9 +269,11 @@ void handleRequestFile(Message recvMess, int connSock) {
 
 void addClientSocket(int id, int connSock) {
 	int i = findClient(id);
+	pthread_mutex_lock(&lock);
 	if(i >= 0) {
 		onlineClient[i].connSock = connSock;
 	}
+	pthread_mutex_unlock(&lock);
 }
 
 void removeFile(char* fileName) {
@@ -378,6 +384,14 @@ void* client_handler(void* conn_sock) {
 	while(1) {
 		//receives message from client
 		if(receiveMessage(connSock, &recvMess) < 0) {
+			printMess(recvMess);
+			if(recvMess.requestId > 0) {
+				int i = findClient(recvMess.requestId);
+				if(i >= 0) {
+					onlineClient[i].requestId = 0;
+					logoutUser(onlineClient[i].username);
+				}
+			}
 			break;
 		}
 		//blocking
@@ -451,7 +465,7 @@ int main(int argc, char **argv)
 	}
 	initArrayClient();
 	readFile();
-	printList();
+	//printList();
 	//Step 4: Communicate with client
 	while(1) {
 		//accept request

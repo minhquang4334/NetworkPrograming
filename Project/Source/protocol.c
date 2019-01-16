@@ -75,7 +75,7 @@ int receiveMessage(int conn_sock, Message *msg) {
   int bytes_received;
   bytes_received = recvMsg(conn_sock, msg);
   if (bytes_received <= 0){
-    printf("\nConnection closed");
+    printf("\nConnection closed\n");
     return -1;
   }
   return 1;
