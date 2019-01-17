@@ -48,6 +48,8 @@ typedef struct Client {
 	int requestId;
 	char username[30];
 	int connSock;
+	int clientSock;
+	int uploadSuccess;
 } Client;
 
 typedef struct FileMatching {

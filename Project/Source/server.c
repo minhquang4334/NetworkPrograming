@@ -32,6 +32,7 @@ void initArrayClient() {
 	int i;
 	for(i = 0; i < 1000; i++) {
 		onlineClient[i].requestId = 0;
+		onlineClient[i].uploadSuccess = 0;
 	}
 }
 // count number param of command
@@ -278,76 +279,46 @@ void addClientSocket(int id, int connSock) {
 
 void removeFile(char* fileName) {
 	// remove file
-    if (remove(fileName) == 0)
-        printf("Handle Success!!! %s file deleted successfully.\n", fileName);
-    else
+    if (remove(fileName) != 0)
     {
-        printf("Unable to delete the file\n");
         perror("Following error occurred\n");
     }
 }
 
-
-int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int connSock) {
+int __sendRequestDownload(int requestId, char* selectedUser, char* fileName, int connSock) {
 	int i = findClientByUsername(selectedUser);
-	char tmpFileName[100];
-	FILE *tmpFile;
-	Message msg, recvMsg, sendMess;
+	Message msg, recvMsg;
+	int index;
 	fflush(stdout);
 	if(i >= 0) {
 		msg.type = TYPE_REQUEST_DOWNLOAD;
 		strcpy(msg.payload, fileName);
 		msg.length = strlen(msg.payload);
-		msg.requestId = onlineClient[i].requestId;
+		msg.requestId = requestId;
 		sendMessage(onlineClient[i].connSock, msg);
-		sprintf(tmpFileName, "%lu", (unsigned long)time(NULL));
-		if((tmpFile = fopen(tmpFileName, "wb+")) == NULL) {
-			msg.type = TYPE_ERROR;
-			sendMessage(connSock, msg);
-			perror("You have not create file permission!!\n");
-			return -1;
-		}
-		pthread_mutex_lock(&lock);
 		while(1) {
-			if(receiveMessage(onlineClient[i].connSock, &recvMsg) < 0) {
+			if((receiveMessage(onlineClient[i].connSock, &recvMsg) < 0) || onlineClient[i].uploadSuccess) {
 				break;
 			}
-			if(recvMsg.type == TYPE_ERROR) {
-				sendMessage(connSock, recvMsg);
-				break;
-			}
-			if(recvMsg.length > 0) {
-				fwrite(recvMsg.payload, 1, recvMsg.length, tmpFile);
-			}
-			else if(recvMsg.length == 0) {
-				fseek(tmpFile, 0, SEEK_SET);
+			index = findClient(recvMsg.requestId);
+			if(index >= 0) {
+				if(recvMsg.type == TYPE_ERROR) {
+					sendMessage(onlineClient[index].clientSock, recvMsg);
+					break;
+				}
+				if(recvMsg.length > 0) {
+					sendMessage(onlineClient[index].clientSock, recvMsg);
+				}
+				else if(recvMsg.length == 0) {
+					sendMessage(onlineClient[index].clientSock, recvMsg);
+					onlineClient[index].uploadSuccess = 1;
+					break;
+				}
+			} else {
 				break;
 			}
 		}
-		pthread_mutex_unlock(&lock);
-		if(recvMsg.type == TYPE_ERROR) {
-			fclose(tmpFile);
-       		removeFile(tmpFileName);
-			return -1;
-		}
-		while(!feof(tmpFile)) {
-			fflush(stdout);
-			//printf("11111111");
-            char buffer[PAYLOAD_SIZE];
-           	int bytes_send = fread(buffer, 1, PAYLOAD_SIZE, tmpFile);
-           	if(bytes_send <= 0) {
-           		break;
-           	}
-            sendMess.length = bytes_send;
-            sendMess.requestId = requestId;
-            memcpy(sendMess.payload, buffer, bytes_send);
-            sendMessage(connSock, sendMess);
-        }
-
-        sendMess.length = 0;
-        sendMessage(connSock, sendMess);
-        fclose(tmpFile);
-       	removeFile(tmpFileName);
+		onlineClient[index].uploadSuccess = 0;
 	} else {
 		msg.type = TYPE_ERROR;
 		sendMessage(connSock, msg);
@@ -355,6 +326,16 @@ int sendRequestDownload(int requestId, char* selectedUser, char* fileName, int c
 	}
 	return 1;
 }
+
+void addClientConnsock(int id, int connSock) {
+	int i = findClient(id);
+	pthread_mutex_lock(&lock);
+	if(i >= 0) {
+		onlineClient[i].clientSock = connSock;
+	}
+	pthread_mutex_unlock(&lock);
+}
+
 void handleRequestDownload(Message recvMess, int connSock) {
 	char** temp = str_split(recvMess.payload, '\n');
 	char selectedUser[30];
@@ -364,7 +345,8 @@ void handleRequestDownload(Message recvMess, int connSock) {
 	if(numberElementsInArray(temp) == 2) {
 		strcpy(selectedUser, temp[0]);
 		strcpy(fileName, temp[1]);
-		sendRequestDownload(recvMess.requestId, selectedUser, fileName, connSock);
+		addClientConnsock(recvMess.requestId, connSock);
+		__sendRequestDownload(recvMess.requestId, selectedUser, fileName, connSock);
 	} else {
 		type = TYPE_ERROR;
 	}
@@ -384,7 +366,6 @@ void* client_handler(void* conn_sock) {
 	while(1) {
 		//receives message from client
 		if(receiveMessage(connSock, &recvMess) < 0) {
-			printMess(recvMess);
 			if(recvMess.requestId > 0) {
 				int i = findClient(recvMess.requestId);
 				if(i >= 0) {

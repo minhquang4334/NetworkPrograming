@@ -222,9 +222,9 @@ void getLoginInfo(char *str){
 	char username[255];
 	char password[255];
 	printf("Enter username?: ");
-	scanf("%s", username);
+	scanf("%[^\n]", username);
 	printf("Enter password?: ");
-	scanf("%s", password);
+	scanf("%[^\n]", password);
 	while(getchar()!='\n');
 	sprintf(mess->payload, "LOGIN\nUSER %s\nPASS %s", username, password);
 	strcpy(str, username);
