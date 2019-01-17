@@ -444,6 +444,7 @@ int main(int argc, char **argv)
 		perror("\nError: ");
 		return 0;
 	}
+	printf("Server start...\n");
 	initArrayClient();
 	readFile();
 	//printList();
