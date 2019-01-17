@@ -27,15 +27,24 @@ pthread_mutex_t lock;
 int requestId = 1;
 
 Client onlineClient[1000];
-
+/*
+* Init Array Client
+* Set default value for Online Client
+* @param 
+* @return void
+*/
 void initArrayClient() {
 	int i;
 	for(i = 0; i < 1000; i++) {
-		onlineClient[i].requestId = 0;
-		onlineClient[i].uploadSuccess = 0;
+		onlineClient[i].requestId = 0;    //set default value 0 for requestId
+		onlineClient[i].uploadSuccess = 0; //set default value 0 for uploadSuccess
 	}
 }
-// count number param of command
+/*
+* count number element in array with unknown size
+* @param temp[][]
+* @return size of array
+*/
 int numberElementsInArray(char** temp) {
 	int i;
 	for (i = 0; *(temp + i); i++)
@@ -44,6 +53,11 @@ int numberElementsInArray(char** temp) {
     }
     return i;
 }
+/*
+* Print List Online Client
+* @param 
+* @return void
+*/
 void printListOnlineClient() {
 	int i;
 	for (i = 0; i < 1000; i++) {
@@ -54,17 +68,25 @@ void printListOnlineClient() {
 		}
 	}
 }
-
+/*
+* find Avaiable Position in Array Client
+* @param 
+* @return position i if valid else return -1
+*/
 int findAvaiableElementInArrayClient() {
 	int i;
 	for (i = 0; i < 1000; i++) {
-		if(onlineClient[i].requestId == 0) {
+		if(onlineClient[i].requestId == 0) {	// avaiable position is position where requestId = 0
 			return i;
 		}
 	}
-	return -1;
+	return -1; // if not have avaiable element
 }
-
+/*
+* find client with request id
+* @param requestId
+* @return position has request id if not return -1
+*/
 int findClient(int requestId) {
 	int i;
 	for (i = 0; i < 1000; i++) {
@@ -74,7 +96,11 @@ int findClient(int requestId) {
 	}
 	return -1;
 }
-
+/*
+* find client with username
+* @param requestId
+* @return position has username if not return -1
+*/
 int findClientByUsername(char* username) {
 	int i;
 	for (i = 0; i < 1000; i++) {
@@ -84,45 +110,57 @@ int findClientByUsername(char* username) {
 	}
 	return -1;
 }
-
+/*
+* set client into online client array
+* @param int id, int requestId, char* username
+* @return void
+*/
 void setClient(int i, int requestId, char* username) {
 	if(i >= 0) {
 		onlineClient[i].requestId = requestId;
-		strcpy(onlineClient[i].username, username);
+		strcpy(onlineClient[i].username, username); //set username for online client
 	} else {
-		printf("Full Client, Service not avaiable!!\n");
+		printf("Full Client, Service not avaiable!!\n"); //If array client full
 	}
 }
-
+void increaseRequestId() {
+	pthread_mutex_lock(&lock); //use mutex for increase shared data requestId
+	requestId++;
+	pthread_mutex_unlock(&lock);
+}
+/*
+* handle login function
+* @param message, int connSock
+* @return void
+*/
 void handleLogin(Message mess, int connSock) {
-	char** temp = str_split(mess.payload, '\n');
+	char** temp = str_split(mess.payload, '\n'); // handle payload, divide payload to array string split by '\n'
 	StatusCode loginCode;
 	//User* curUser = NULL;
 	if(numberElementsInArray(temp) == 3) {
-		char** userStr = str_split(temp[1], ' ');
-		char** passStr = str_split(temp[2], ' ');
-		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) {
-			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) {
+		char** userStr = str_split(temp[1], ' '); // get username
+		char** passStr = str_split(temp[2], ' '); // get password
+		if((numberElementsInArray(userStr) == 2) && (numberElementsInArray(passStr) == 2)) { //check payload structure valid with two parameters
+			if(!(strcmp(userStr[0], COMMAND_USER) || strcmp(passStr[0], COMMAND_PASSWORD))) { //check payload structure valid with two parameters
 				char username[30];
 				char password[20];
 				strcpy(username, userStr[1]);
 				strcpy(password, passStr[1]);
-				if(validateUsername(username) || validatePassword(password)) {
-					loginCode = login(username, password);
+				if(validateUsername(username) || validatePassword(password)) { // check username and password are valid
+					loginCode = login(username, password); // login with username and password 
 					if(loginCode != LOGIN_SUCCESS)
 						mess.type = TYPE_ERROR;
 					else{
 						if(mess.requestId == 0) {
-							pthread_mutex_lock(&lock);
-							mess.requestId = requestId++;
+							mess.requestId = requestId;
+							increaseRequestId();
 							int i = findAvaiableElementInArrayClient();
-							setClient(i, mess.requestId, username);
-							pthread_mutex_unlock(&lock);
+							setClient(i, mess.requestId, username); // when user login success set user to online client
 						}
 					}
 				} else {
 					mess.type = TYPE_ERROR;
-					loginCode = USERNAME_OR_PASSWORD_INVALID;
+					loginCode = USERNAME_OR_PASSWORD_INVALID; //set login code
 				}
 			}
 			else{
@@ -142,7 +180,11 @@ void handleLogin(Message mess, int connSock) {
 	}
 	sendWithCode(mess, loginCode, connSock);
 }
-
+/*
+* handle register function
+* @param message, int connSock
+* @return void
+*/
 void handleRegister(Message mess, int connSock){
 	char** temp = str_split(mess.payload, '\n');
 	StatusCode registerCode;
@@ -161,11 +203,10 @@ void handleRegister(Message mess, int connSock){
 						mess.type=TYPE_ERROR;
 					else {
 						if(mess.requestId == 0) {
-							pthread_mutex_lock(&lock);
-							mess.requestId = requestId++;
+							mess.requestId = requestId;
+							increaseRequestId();
 							int i = findAvaiableElementInArrayClient();
 							setClient(i, mess.requestId, username);
-							pthread_mutex_unlock(&lock);
 						}
 					}
 				} else {

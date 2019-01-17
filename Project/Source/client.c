@@ -344,10 +344,14 @@ void authenticateFunc() {
 void showListFile() {
 	DIR *dir;
 	struct dirent *ent;
-	if ((dir = opendir (".")) != NULL) {
+	char folderPath[100];
+	sprintf(folderPath, "./%s", current_user);
+	if ((dir = opendir (folderPath)) != NULL) {
 	  /* print all the files and directories within directory */
 	  while ((ent = readdir (dir)) != NULL) {
-	    printf ("%s\n", ent->d_name);
+	  	if(ent->d_name[0] != '.') {
+	  		printf ("%s\n", ent->d_name);
+	  	}
 	  }
 	  closedir (dir);
 	} else {
