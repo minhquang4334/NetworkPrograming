@@ -27,7 +27,11 @@ pthread_mutex_t lock;
 int requestId = 1;
 
 Client onlineClient[1000];
-
+/*
+* Check valid port number
+* @param int port
+* @return 1 if valid port number, else return 0
+*/
 void initArrayClient() {
 	int i;
 	for(i = 0; i < 1000; i++) {
