@@ -158,6 +158,7 @@ int registerUser(char* username, char* password){
 	User *user = searchUser(username);
 	if(user == NULL){
 		user = createNewUser(username, password, ACTIVE);
+		user->isLogin = ONLINE;
 		append(user);
 		updateFile();
 		return REGISTER_SUCCESS;
