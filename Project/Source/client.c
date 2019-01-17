@@ -222,9 +222,10 @@ void getLoginInfo(char *str){
 	char username[255];
 	char password[255];
 	printf("Enter username?: ");
-	scanf("%[^\n]", username);
+	scanf("%[^\n]s", username);
+	while(getchar() != '\n');
 	printf("Enter password?: ");
-	scanf("%[^\n]", password);
+	scanf("%[^\n]s", password);
 	while(getchar()!='\n');
 	sprintf(mess->payload, "LOGIN\nUSER %s\nPASS %s", username, password);
 	strcpy(str, username);
@@ -251,11 +252,13 @@ void loginFunc(char *current_user){
 int getRegisterInfo(char *user){
 	char username[255], password[255], confirmPass[255];
 	printf("Username: ");
-	scanf("%s", username);
+	scanf("%[^\n]s", username);
 	printf("Password: ");
-	scanf("%s", password);
+	while(getchar()!='\n');
+	scanf("%[^\n]s", password);
 	printf("Confirm password: ");
-	scanf("%s", confirmPass);
+	while(getchar()!='\n');
+	scanf("%[^\n]s", confirmPass);
 	while(getchar()!='\n');
 	if(!strcmp(password, confirmPass)){
 		sprintf(mess->payload, "REGISTER\nUSER %s\nPASS %s", username, password);

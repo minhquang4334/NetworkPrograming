@@ -304,7 +304,7 @@ int __sendRequestDownload(int requestId, char* selectedUser, char* fileName, int
 			if(index >= 0) {
 				if(recvMsg.type == TYPE_ERROR) {
 					sendMessage(onlineClient[index].clientSock, recvMsg);
-					break;
+					return -1;
 				}
 				if(recvMsg.length > 0) {
 					sendMessage(onlineClient[index].clientSock, recvMsg);
