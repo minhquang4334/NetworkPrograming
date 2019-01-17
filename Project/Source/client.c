@@ -30,7 +30,12 @@ int isOnline = 0;
 char fileRepository[100];
 #define DIM(x) (sizeof(x)/sizeof(*(x)))
 
-// count number param of command
+
+/*
+* count number param of command
+* @param temp
+* @return number param
+*/
 int numberElementsInArray(char** temp) {
 	int i;
 	for (i = 0; *(temp + i); i++)
@@ -39,8 +44,12 @@ int numberElementsInArray(char** temp) {
     }
     return i;
 }
-// init new socket
-// print error if have error
+
+/*
+* init new socket - print error if have error
+* @param message, int connSock
+* @return new socket
+*/
 int initSock(){
 	int newsock = socket(AF_INET, SOCK_STREAM, 0);
 	if (newsock == -1 ){
@@ -50,6 +59,11 @@ int initSock(){
 	return newsock;
 }
 
+/*
+* handle show notify
+* @param notify
+* @return void
+*/
 void *showBubbleNotify(void *notify){	
 	char command[200];
 	sprintf(command, "terminal-notifier -message \"%s\"", notify);
@@ -57,13 +71,22 @@ void *showBubbleNotify(void *notify){
 	return NULL;
 }
 
-// bind socket of client 
+/*
+* handle bind new socket to server
+* @param connect port, serverAddr
+* @return void
+*/ 
 void bindClient(int port, char *serverAddr){
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(port);
 	server_addr.sin_addr.s_addr = inet_addr(serverAddr);
 }
 
+/*
+* handle find or create folder as user
+* @param username
+* @return void
+*/
 void findOrCreateFolderUsername(char* username) {
 	struct stat st = {0};
 	if (stat(username, &st) == -1) {
@@ -72,10 +95,20 @@ void findOrCreateFolderUsername(char* username) {
 	strcpy(fileRepository, username);
 }
 
+/*
+* handle get path of file to folder of user
+* @param filename, fullpath
+* @return void
+*/
 void getFullPath(char* fileName, char* fullPath) {
 	sprintf(fullPath, "%s/%s", fileRepository, fileName);
 }
 
+/*
+* handle get file as request
+* @param message
+* @return void
+*/
 void handleRequestFile(Message recvMess) {
 	//printMess(recvMess);
 	Message msg;
@@ -105,6 +138,11 @@ void handleRequestFile(Message recvMess) {
 	sendMessage(under_client_sock, msg);
 }
 
+/*
+* handle upload file to server
+* @param message
+* @return void
+*/
 void uploadFile(Message recvMess) {
 	char fileName[30];
 	char fullPath[100];
@@ -154,6 +192,11 @@ void uploadFile(Message recvMess) {
     }
 }
 
+/*
+* method of socket run on background
+* @param 
+* @return void
+*/
 void* backgroundHandle() {
 	// hanlde request in background
 	Message recvMess;
@@ -177,6 +220,11 @@ void* backgroundHandle() {
 	return NULL;
 }
 
+/*
+* handle ping server as new socket was init
+* @param 
+* @return void
+*/
 void pingServerToConfirmBackgroundThread() {
 	mess->type = TYPE_BACKGROUND;
 	sendMessage(under_client_sock, *mess);
@@ -213,6 +261,11 @@ void backgroundHandleEnd(){
 	close(under_client_sock);
 }
 
+/*
+* print waiting message to screen when waitng download
+* @param
+* @return void
+*/
 void printWatingMsg() {
 	printf("\n..................Please waiting................\n");
 }
@@ -231,6 +284,11 @@ void getLoginInfo(char *str){
 	strcpy(str, username);
 }
 
+/*
+* get login info and login
+* @param current user
+* @return void
+*/
 void loginFunc(char *current_user){
 	char username[255];
 	mess->type = TYPE_AUTHENTICATE;
@@ -249,6 +307,11 @@ void loginFunc(char *current_user){
 	printf("%s\n", mess->payload);
 }
 
+/*
+* get register info 
+* @param user
+* @return void
+*/
 int getRegisterInfo(char *user){
 	char username[255], password[255], confirmPass[255];
 	printf("Username: ");
@@ -272,6 +335,11 @@ int getRegisterInfo(char *user){
 	
 }
 
+/*
+* get register info and login
+* @param current user
+* @return void
+*/
 void registerFunc(char *current_user){
 	char username[255];
 	if(getRegisterInfo(username)){
@@ -291,6 +359,11 @@ void registerFunc(char *current_user){
 	}
 }
 
+/*
+* logout from system
+* @param current user
+* @return void
+*/
 void logoutFunc(char *current_user){
 	mess->type = TYPE_AUTHENTICATE;
 	sprintf(mess->payload, "LOGOUT\n%s", current_user);
@@ -305,6 +378,11 @@ void logoutFunc(char *current_user){
 	printf("%s\n", mess->payload);
 }
 
+/*
+* get show first menu of application 
+* @param 
+* @return void
+*/
 void menuAuthenticate() {
 	printf("\n---------------FileShareSystem-------------\n");
 	printf("\n1 - Login");
@@ -313,6 +391,11 @@ void menuAuthenticate() {
 	printf("\nPlease choose: ");
 }
 
+/*
+* get show main menu of application 
+* @param 
+* @return void
+*/
 void mainMenu() {
 	printf("\n---------------FileShareSystem-------------\n");
 	printf("\n1 - Search File In Shared System");
@@ -322,6 +405,11 @@ void mainMenu() {
 	printf("\nPlease choose: ");
 }
 
+/*
+* get check type request of authenticate
+* @param 
+* @return void
+*/
 void authenticateFunc() {
 	menuAuthenticate();
 	scanf("%c", &choose);
@@ -341,6 +429,11 @@ void authenticateFunc() {
 	
 }
 
+/*
+* show list file of user
+* @param 
+* @return void
+*/
 void showListFile() {
 	DIR *dir;
 	struct dirent *ent;
@@ -359,6 +452,12 @@ void showListFile() {
 	  perror ("Permission denied!!");
 	}
 }
+
+/*
+* remove one file
+* @param filename
+* @return void
+*/
 void removeFile(char* fileName) {
 	// remove file
     if (remove(fileName) != 0)
@@ -367,6 +466,11 @@ void removeFile(char* fileName) {
     }
 }
 
+/*
+* show list user who have file
+* @param 
+* @return void
+*/
 int showListSelectUser(char* listUser, char* username, char* fileName) {
 	if(strlen(listUser) == 0) {
 		printf("\n--This File Not Found In System!!\n");
@@ -406,6 +510,11 @@ int showListSelectUser(char* listUser, char* username, char* fileName) {
 	return 1;
 }
 
+/*
+* receive file from server and save
+* @param filename, path
+* @return void
+*/
 int download(char* fileName, char* path) {
 	Message recvMsg;
 	FILE *fptr;
@@ -440,7 +549,11 @@ int download(char* fileName, char* path) {
 }
 
 
-
+/*
+* method download
+* @param filename, path
+* @return void
+*/
 void handleDownloadFile(char* selectedUser,char* fileName) {
 	Message msg;
 	msg.requestId = mess->requestId;
@@ -461,6 +574,11 @@ void handleDownloadFile(char* selectedUser,char* fileName) {
 	printf("...Donwload Success.. File save in %s\n", path);
 }
 
+/*
+* search file method 
+* @param 
+* @return void
+*/
 void handleSearchFile() {
 	char fileName[100];
 	char selectedUser[30];
@@ -496,6 +614,11 @@ void handleSearchFile() {
 	}	
 }
 
+/*
+* how to use system manual
+* @param 
+* @return void
+*/
 void manual() {
 	printf("\n---- For search and download file from system press 1 and type file name\n");
 	printf("---- For view list file in your folder press 2\n");
@@ -510,6 +633,11 @@ void manual() {
 	return;
 }
 
+/*
+* check type file request
+* @param 
+* @return void
+*/
 void requestFileFunc() {
 	mainMenu();
 	scanf("%c", &choose);
